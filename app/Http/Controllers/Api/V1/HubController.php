@@ -944,9 +944,9 @@ class HubController extends Controller
     {
         $base = ShipmentItem::query()->atHub($hub->id);
 
-        // Parcels still waiting to go on a bus. Deliberately not the
-        // dispatched count — see ShipmentItem::scopeAwaitingBus().
-        $readyForBus = (clone $base)->awaitingBus($hub)->count();
+        // Parcels assigned to a different hub and still waiting to go. Deliberately
+        // not the dispatched count — see ShipmentItem::scopeWaitingBus().
+        $readyForBus = (clone $base)->waitingBus($hub)->count();
 
         return [
             'at_hub' => (clone $base)->whereIn('status', array_map(

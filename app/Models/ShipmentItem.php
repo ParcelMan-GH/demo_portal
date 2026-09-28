@@ -8,6 +8,7 @@ use App\Helpers\CodeResolver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
@@ -146,45 +147,41 @@ class ShipmentItem extends Model
     }
 
     /**
-     * Parcels this hub is holding that still have to go on a bus.
+     * Parcels this hub is holding that have to go on a bus to another hub.
      *
      * This is the dashboard's "Ready for Bus" tile. Three things must hold:
      *
      *  1. the parcel is here — by either arrival route, see `scopeAtHub()`;
-     *  2. it is still awaiting outbound movement, meaning its status is one that
-     *     says "sitting at a hub" and it has not already been handed over. That
-     *     second half is the bug this replaces: the tile used to count
-     *     `dispatched_to_bus`, i.e. parcels that had already gone, so it read
-     *     zero in normal operation and meant the opposite of its own label;
-     *  3. its destination is not one this hub can serve itself. A parcel we can
-     *     prove is destined inside the hub's own region is local delivery work,
-     *     not a bus consignment.
+     *  2. it is still awaiting outbound movement — its status is one that says
+     *     "sitting at a hub", and it has not already been handed to a bus. Statuses
+     *     like `dispatched_to_bus` are not in that set, so a parcel that has gone
+     *     cannot be counted. That is the bug this replaced: the tile used to count
+     *     `dispatched_to_bus` itself, meaning the opposite of its own label and
+     *     reading zero in normal operation;
+     *  3. it is *assigned to a different hub*. A parcel is only bus work when the
+     *     parcel itself says so, by being in a sort batch whose destination
+     *     warehouse is another hub. `destination_warehouse_id` is the one place
+     *     this system records a target hub, and it already uses NULL to mean
+     *     "local, no inter-hub transfer" — which is why an unassigned parcel is
+     *     excluded rather than guessed at.
      *
-     * A parcel with no recorded destination is counted on purpose. It cannot be
-     * shown to be local, and the hub is still holding it and still has to move
-     * it somewhere — excluding it would under-report the hub's workload, which is
-     * the failure this tile is already recovering from.
+     * Comparing hubs rather than regions is the point: two hubs can share a region
+     * (Accra Main and Tema Warehouse are both region 1), so a region test both
+     * missed genuine inter-hub transfers and counted parcels that were never going
+     * anywhere else.
      *
      * @param  \Illuminate\Database\Eloquent\Builder<ShipmentItem>  $query
      * @return \Illuminate\Database\Eloquent\Builder<ShipmentItem>
      */
-    public function scopeAwaitingBus($query, Warehouse $hub)
+    public function scopeWaitingBus($query, Warehouse $hub)
     {
-        $query->atHub($hub->id)
+        return $query->atHub($hub->id)
             ->whereIn('status', array_map(fn (ItemStatus $status) => $status->value, self::AT_HUB_STATUSES))
-            ->whereDoesntHave('busHandoffs');
-
-        // Only meaningful when the hub itself carries a region to compare with.
-        // Without one the region test would compare against NULL and exclude
-        // everything, which is the failure mode being fixed.
-        if (filled($hub->region_id)) {
-            $query->where(function ($destination) use ($hub) {
-                $destination->whereNull('delivery_region_id')
-                    ->orWhere('delivery_region_id', '!=', $hub->region_id);
+            ->whereDoesntHave('busHandoffs')
+            ->whereHas('sortBatches', function ($batch) use ($hub) {
+                $batch->whereNotNull('sort_batches.destination_warehouse_id')
+                    ->where('sort_batches.destination_warehouse_id', '!=', $hub->id);
             });
-        }
-
-        return $query;
     }
 
     /**
@@ -347,6 +344,21 @@ class ShipmentItem extends Model
     public function busHandoffConfirmations(): HasMany
     {
         return $this->hasMany(BusHandoffConfirmation::class);
+    }
+
+    /**
+     * The sort batches this parcel has been allocated to.
+     *
+     * Carries the destination hub: `sort_batches.destination_warehouse_id` is
+     * where a parcel is going when it is going to another hub, and NULL when it
+     * is staying local. Rows with `removed_at` set are excluded — the parcel was
+     * taken back out of that batch, so it is no longer assigned to that hub.
+     */
+    public function sortBatches(): BelongsToMany
+    {
+        return $this->belongsToMany(SortBatch::class, 'sort_batch_items')
+            ->withPivot(['quantity_allocated', 'added_at', 'removed_at'])
+            ->wherePivotNull('removed_at');
     }
 
     /**
