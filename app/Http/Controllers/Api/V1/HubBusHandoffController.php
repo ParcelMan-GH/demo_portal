@@ -193,6 +193,11 @@ class HubBusHandoffController extends Controller
                 'summary' => [
                     'total' => $total,
                     'today' => (clone $query)->whereDate('created_at', today())->count(),
+                    // Counted across every handover in the database, not just the
+                    // page that was returned. The app used to derive this from the
+                    // loaded rows, so the tile read "0" for a hub with 40 untethered
+                    // handovers once only 20 of them were on the page.
+                    'not_texted' => (clone $query)->whereNull('sms_sent_at')->count(),
                 ],
             ],
         ]);

@@ -198,6 +198,162 @@ class HubBusHandoffService
     }
 
     /**
+     * Hand a whole consignment to one bus: many parcels, one photo, one load.
+     *
+     * The photo is taken once and shared by every parcel's record — it is the
+     * same physical handover, and copying the bytes per parcel would only waste
+     * storage. Each parcel still gets its own `hub_bus_handoffs` row, because
+     * each one has its own recipient, its own link, and its own SMS outcome to
+     * report on.
+     *
+     * Parcels that cannot go on this bus (not at this hub, not in a dispatchable
+     * status, already handed over) are skipped and named in the result rather
+     * than failing the whole dispatch — a hub does not hold up a loaded bus for
+     * one parcel that is not in the pile.
+     *
+     * @param  \Illuminate\Support\Collection<int, ShipmentItem>  $items
+     * @return array{success: bool, message: string, status: int, data?: array}
+     */
+    public function handOverBatch(
+        Warehouse $hub,
+        User $agent,
+        $items,
+        array $attributes,
+        UploadedFile $photo,
+        ?string $destination = null,
+        ?string $groupLabel = null
+    ): array {
+        $notify = [];   // handoffs to text once the transaction has committed
+        $skipped = [];
+
+        $created = DB::transaction(function () use ($hub, $agent, $items, $attributes, $photo, $destination, $groupLabel, &$notify, &$skipped) {
+            // One upload for the load. Grouped under the batch when there is one
+            // so the admin's file listing lines up with the dispatch.
+            $upload = $this->storageService->upload(
+                $photo,
+                'hubs/'.$hub->id.'/bus-handoffs/'.($groupLabel ? Str::slug($groupLabel) : 'batch')
+            );
+
+            $now = now();
+            $handoffs = [];
+
+            foreach ($items as $item) {
+                $locked = ShipmentItem::query()->whereKey($item->id)->lockForUpdate()->first();
+
+                if (! $locked) {
+                    $skipped[] = "{$item->tracking_code}: no longer exists";
+
+                    continue;
+                }
+
+                if ($error = $this->eligibilityError($hub, $locked)) {
+                    $skipped[] = "{$locked->tracking_code}: {$error['message']}";
+
+                    continue;
+                }
+
+                $handoff = HubBusHandoff::query()->create([
+                    'shipment_item_id' => $locked->id,
+                    'hub_id' => $hub->id,
+                    'outgoing_batch_id' => $locked->outgoing_batch_id,
+                    'handed_off_by' => $agent->id,
+                    'driver_name' => $attributes['driver_name'],
+                    'driver_phone' => $attributes['driver_phone'] ?? null,
+                    'driver_id_number' => $attributes['driver_id_number'] ?? null,
+                    'vehicle_plate' => $attributes['vehicle_plate'] ?? null,
+                    'vehicle_description' => $attributes['vehicle_description'] ?? null,
+                    'bus_company' => $attributes['bus_company'] ?? null,
+                    'destination' => $destination,
+                    'departure_at' => $attributes['departure_at'] ?? $now,
+                    'proof_photo_path' => $upload['path'],
+                    'proof_photo_size' => $upload['size'] ?? null,
+                    'proof_photo_taken_at' => $attributes['photo_taken_at'] ?? $now,
+                    'notes' => $attributes['notes'] ?? null,
+                ]);
+
+                $locked->update([
+                    'status' => ItemStatus::DISPATCHED_TO_BUS->value,
+                    'dispatched_to_bus_at' => $now,
+                ]);
+
+                ShipmentItemTracking::query()->create([
+                    'shipment_item_id' => $locked->id,
+                    'status' => ItemStatus::DISPATCHED_TO_BUS->value,
+                    'location' => $hub->name,
+                    'notes' => 'Handed to bus driver '.$handoff->driver_name
+                        .($handoff->vehicle_plate ? " ({$handoff->vehicle_plate})" : '')
+                        .($destination ? " for {$destination}" : '')
+                        .($groupLabel ? " with {$groupLabel}" : ''),
+                    'meta' => array_filter([
+                        'source' => 'hub_bus_handoff_batch',
+                        'handoff_id' => $handoff->id,
+                        'group' => $groupLabel,
+                        'bus_company' => $handoff->bus_company,
+                        'driver_name' => $handoff->driver_name,
+                        'vehicle_plate' => $handoff->vehicle_plate,
+                        'proof_photo_path' => $handoff->proof_photo_path,
+                        'departure_at' => $handoff->departure_at?->toIso8601String(),
+                    ], fn ($value) => $value !== null && $value !== ''),
+                    'created_by' => $agent->id,
+                    'created_at' => $now,
+                ]);
+
+                $handoffs[] = $handoff;
+                $notify[] = $handoff;
+            }
+
+            return $handoffs;
+        });
+
+        if (empty($created)) {
+            return [
+                'success' => false,
+                'message' => $skipped
+                    ? 'Nothing could be dispatched. '.implode(' ', array_slice($skipped, 0, 3))
+                    : 'There was nothing in this selection to dispatch.',
+                'status' => 422,
+            ];
+        }
+
+        // Text each recipient their own link, after the dispatch has committed.
+        $smsSent = 0;
+
+        foreach ($notify as $handoff) {
+            if (($this->notifyCustomer($handoff)['sent'] ?? false) === true) {
+                $smsSent++;
+            }
+        }
+
+        $dispatched = count($created);
+        $message = $dispatched.' '.Str::plural('parcel', $dispatched).' handed to '
+            .($attributes['driver_name'] ?? 'the bus driver')
+            .($groupLabel ? " with {$groupLabel}" : '').'.';
+
+        if ($smsSent > 0) {
+            $message .= " {$smsSent} ".Str::plural('recipient', $smsSent).' texted the handover photo.';
+        }
+
+        if ($skipped) {
+            $message .= ' Skipped '.count($skipped).': '.implode(' ', array_slice($skipped, 0, 3));
+        }
+
+        return [
+            'success' => true,
+            'message' => $message,
+            'status' => 201,
+            'data' => [
+                'handoffs' => collect($created)
+                    ->map(fn (HubBusHandoff $handoff) => $this->payload($handoff->fresh()))
+                    ->values()
+                    ->all(),
+                'dispatched_count' => $dispatched,
+                'sms_sent_count' => $smsSent,
+                'skipped' => $skipped,
+            ],
+        ];
+    }
+
+    /**
      * Text the customer a link to the handover photo.
      *
      * @return array{sent: bool, phone: string|null, error: string|null}

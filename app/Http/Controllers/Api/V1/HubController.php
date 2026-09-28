@@ -11,6 +11,7 @@ use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\HubBusHandoffService;
 use App\Services\SmsService;
 use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
@@ -26,6 +27,12 @@ use Illuminate\Support\Collection;
  */
 class HubController extends Controller
 {
+    /**
+     * The bus handoff side of the app. Batch dispatch goes through it so a
+     * whole-load handover writes the same record and evidence as a single one.
+     */
+    public function __construct(private HubBusHandoffService $busHandoffs) {}
+
     /**
      * Statuses that mean "this parcel is physically sitting in the hub".
      *
@@ -503,12 +510,17 @@ class HubController extends Controller
             'package_ids' => ['nullable', 'array'],
             'package_ids.*' => ['integer'],
             'transport_driver_id' => ['nullable', 'integer'],
-            'driver_name' => ['nullable', 'string', 'max:120'],
+            'driver_name' => ['required', 'string', 'max:120'],
             'driver_phone' => ['nullable', 'string', 'max:30'],
+            'driver_id_number' => ['nullable', 'string', 'max:60'],
             'vehicle_plate' => ['nullable', 'string', 'max:30'],
+            'vehicle_description' => ['nullable', 'string', 'max:120'],
             'bus_company' => ['nullable', 'string', 'max:120'],
             'departure_time' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
+            // Same rule as the single-parcel flow: no photo, no handover. A
+            // batch is still a physical handover and needs the same evidence.
+            'proof_photo' => ['required', 'file', 'image', 'max:10240'],
         ]);
 
         $user = $request->user();
@@ -548,35 +560,27 @@ class HubController extends Controller
             return $this->failed('There is nothing in this hub to dispatch for that selection.', 422);
         }
 
-        $meta = array_filter([
-            'source' => 'hub_handoff',
-            'batch_number' => $batch?->batch_number,
-            'driver_name' => $validated['driver_name'] ?? null,
-            'driver_phone' => $validated['driver_phone'] ?? null,
-            'vehicle_plate' => $validated['vehicle_plate'] ?? null,
-            'bus_company' => $validated['bus_company'] ?? null,
-            'departure_time' => $validated['departure_time'] ?? null,
-        ], fn ($value) => $value !== null && $value !== '');
+        // A whole batch is the same handover as a single parcel, one load at a
+        // time: the same evidence, the same per-parcel record, and the same
+        // text to each recipient. It goes through the handoff service so both
+        // routes cannot drift apart again.
+        $result = $this->busHandoffs->handOverBatch(
+            $hub,
+            $user,
+            $items,
+            $validated,
+            $request->file('proof_photo'),
+            $batch
+                ? $this->destinationLabelForBatch($batch)
+                : $this->destinationLabelForItems($items),
+            $batch?->batch_number
+        );
 
-        $dispatched = [];
-
-        foreach ($items as $item) {
-            $item->update([
-                'status' => ItemStatus::DISPATCHED_TO_BUS->value,
-                'dispatched_to_bus_at' => now(),
-            ]);
-
-            $this->logTracking(
-                $item,
-                ItemStatus::DISPATCHED_TO_BUS,
-                $hub,
-                'Dispatched from '.$hub->name.' on an intercity bus',
-                $meta + ['notes' => $validated['notes'] ?? null],
-                (int) $user->id
-            );
-
-            $dispatched[] = $this->serializePackage($item->fresh(), $hub);
+        if (! ($result['success'] ?? false)) {
+            return $this->failed($result['message'], $result['status'] ?? 422);
         }
+
+        $dispatched = $result['data']['dispatched_count'] ?? 0;
 
         if ($batch) {
             $batch->update(array_filter([
@@ -587,16 +591,39 @@ class HubController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => count($dispatched).' '.str('package')->plural(count($dispatched))
-                .' dispatched'.($batch ? " for batch {$batch->batch_number}" : '').'.',
+            'message' => $result['message'].($batch ? " Batch {$batch->batch_number} is now dispatched." : ''),
             'data' => [
                 'hub' => $this->serializeHub($hub),
                 'batch_number' => $batch?->batch_number,
                 'batch_status' => $batch?->fresh()->status,
-                'dispatched_count' => count($dispatched),
-                'packages' => $dispatched,
+                'dispatched_count' => $dispatched,
+                'sms_sent_count' => $result['data']['sms_sent_count'] ?? 0,
+                'skipped' => $result['data']['skipped'] ?? [],
+                'handoffs' => $result['data']['handoffs'] ?? [],
+                'packages' => $items->map(fn (ShipmentItem $item) => $this->serializePackage($item->fresh(), $hub))->values(),
             ],
-        ]);
+        ], 201);
+    }
+
+    /**
+     * Where this consignment is headed, for the handover record.
+     *
+     * The batch knows its own destination; an ad-hoc selection falls back to the
+     * first parcel's, which is what the bus driver is told anyway.
+     */
+    private function destinationLabelForBatch(OutgoingBatch $batch): ?string
+    {
+        return $this->destinationLabel($batch->delivery_region_id, $batch->delivery_district_id);
+    }
+
+    /** @param  \Illuminate\Support\Collection<int, ShipmentItem>  $items */
+    private function destinationLabelForItems($items): ?string
+    {
+        $first = $items->first();
+
+        return $first
+            ? $this->destinationLabel($first->delivery_region_id, $first->delivery_district_id)
+            : null;
     }
 
     /**
