@@ -64,6 +64,9 @@ Route::prefix('v1/hub')->group(function () {
         Route::post('logout', [HubAuthController::class, 'logout']);
         Route::get('me', [HubController::class, 'me']);
 
+        // The home screen in one call: agent, hub, live counters, recent work.
+        Route::get('dashboard', [HubController::class, 'dashboard']);
+
         // Batch intake & scanning.
         Route::post('batches/intake', [HubController::class, 'intake']);
         Route::get('batches', [HubController::class, 'batches']);
@@ -87,6 +90,9 @@ Route::prefix('v1/hub')->group(function () {
         // Release to a rider or the recipient.
         Route::post('packages/release', [HubController::class, 'release']);
         Route::post('packages/shelf', [HubController::class, 'shelve']);
+
+        // Text the recipient that their parcel is waiting at the hub.
+        Route::post('packages/{package}/notify-recipient', [HubController::class, 'notifyRecipient']);
 
         // Recent hub activity, for the notifications screen.
         Route::get('activity', [HubController::class, 'activity']);

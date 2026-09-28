@@ -9,7 +9,10 @@ use App\Models\OutgoingBatch;
 use App\Models\Region;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
+use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\SmsService;
+use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -81,15 +84,52 @@ class HubController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => [
-                    'id' => (string) $user->id,
-                    'name' => $user->name,
-                    'phone' => $user->phone,
+                // The hub header renders the agent's own name, photo and hub, so
+                // the server sends them rather than the screen inventing one.
+                'user' => array_merge($this->serializeUser($user), [
                     // The side to open first, when the account holds both.
                     'role' => $appRoles[0] ?? null,
                     'roles' => $appRoles,
-                ],
+                ]),
                 'hub' => $this->serializeHub($hub),
+            ],
+        ]);
+    }
+
+    /**
+     * Everything the hub home screen needs in one call: who is signed in, which
+     * hub they run, the live counters and the recent work feed.
+     *
+     * The figures mirror `inventory`, but are named for the dashboard tiles so
+     * the home screen can draw three numbers without pulling the whole
+     * inventory down.
+     */
+    public function dashboard(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $hub = $user->warehouse;
+
+        if (! $hub) {
+            return $this->failed('No hub is assigned to this account. Ask an administrator to assign you to a hub.', 403);
+        }
+
+        $counts = $this->hubCounts($hub);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'hub' => $this->serializeHub($hub),
+                'user' => $this->serializeUser($user),
+                'metrics' => [
+                    'in_hub_count' => $counts['at_hub'],
+                    'inbound_today_count' => $counts['received_today'],
+                    'ready_for_bus_count' => $counts['dispatched_to_bus'],
+                    'released_today_count' => $counts['released_today'],
+                ],
+                // Retained in the shape the hub screens already read.
+                'counts' => $counts,
+                // Newest first, empty for an account that has done nothing yet.
+                'recent_activities' => $this->recentActivities($hub, 8),
             ],
         ]);
     }
@@ -210,18 +250,112 @@ class HubController extends Controller
             $received[] = $this->serializePackage($item->fresh(), $hub);
         }
 
+        // A batch is only "received" once every parcel in it is physically at
+        // this hub. Scanning them one at a time is normal, so the batch flips on
+        // the last one rather than on the first — and the check is idempotent.
+        $batchStatus = $batch?->status;
+
+        if ($batch) {
+            $outstanding = $batch->shipmentItems()
+                ->where(function ($query) use ($hub) {
+                    $query->whereNull('arrived_at_hub_at')
+                        ->orWhereNull('hub_id')
+                        ->orWhere('hub_id', '!=', $hub->id);
+                })
+                ->count();
+
+            if ($outstanding === 0 && $batch->status !== OutgoingBatch::STATUS_ARRIVED_AT_HUB) {
+                $batch->update(['status' => OutgoingBatch::STATUS_ARRIVED_AT_HUB]);
+            }
+
+            $batchStatus = $batch->fresh()?->status;
+        }
+
+        $message = $this->intakeMessage($received, $alreadyAtHub, $batch);
+
+        if ($batch && $batchStatus === OutgoingBatch::STATUS_ARRIVED_AT_HUB) {
+            $message .= " Batch {$batch->batch_number} is now marked received at {$hub->name}.";
+        }
+
         return response()->json([
             'success' => true,
-            'message' => $this->intakeMessage($received, $alreadyAtHub, $batch),
+            'message' => $message,
             'data' => [
                 'hub' => $this->serializeHub($hub),
                 'batch_number' => $batch?->batch_number,
+                'batch_status' => $batchStatus,
                 'received_count' => count($received),
                 'already_at_hub_count' => count($alreadyAtHub),
                 'packages' => $received,
                 'already_at_hub' => $alreadyAtHub,
             ],
         ]);
+    }
+
+    /**
+     * Text the recipient that their parcel is waiting, with the code they need
+     * to collect it.
+     *
+     * A hub desk is often handed a parcel with no pickup code yet (it was
+     * created before the hub existed), so one is allocated on the way out rather
+     * than refusing to notify.
+     */
+    public function notifyRecipient(Request $request, string $package, SmsService $smsService): JsonResponse
+    {
+        $hub = $request->user()->warehouse;
+
+        if (! $hub) {
+            return $this->failed('No hub is assigned to this account. Ask an administrator to assign you to a hub.', 403);
+        }
+
+        $item = ShipmentItem::query()->where('hub_id', $hub->id)->find($package)
+            ?? $this->findItemByCode($package);
+
+        if (! $item || (int) $item->hub_id !== (int) $hub->id) {
+            return $this->failed("No package found for {$package} at this hub.", 404);
+        }
+
+        $phone = $item->delivery_recipient_phone;
+
+        if (! $phone) {
+            return $this->failed('This parcel has no recipient phone number on file.', 422);
+        }
+
+        if (! $item->pickup_code) {
+            $item->forceFill(['pickup_code' => $this->generatePickupCode()])->save();
+        }
+
+        // Branded like the other customer texts in this codebase. Not
+        // config('app.name') — that still reads "Laravel" here, and it also
+        // derives the session cookie name, so it is not safe to flip casually.
+        $sent = $smsService->send($phone, sprintf(
+            'ParcelMan: your parcel %s has arrived at %s. Collect it with pickup code %s.',
+            $item->tracking_code ?: $item->id,
+            $hub->name,
+            $item->pickup_code
+        ));
+
+        $this->logTracking(
+            $item,
+            $item->status instanceof ItemStatus ? $item->status : ItemStatus::ARRIVED_AT_HUB,
+            $hub,
+            $sent
+                ? "Pickup notification sent to {$item->delivery_recipient_name}"
+                : "Pickup notification to {$item->delivery_recipient_name} could not be sent",
+            ['source' => 'hub_notify_recipient', 'sent' => $sent],
+            (int) $request->user()->id
+        );
+
+        return response()->json([
+            'success' => $sent,
+            'message' => $sent
+                ? "Pickup notification sent to {$item->delivery_recipient_name}."
+                : 'The pickup notification could not be sent. Check the SMS provider and try again.',
+            'data' => [
+                'sent' => $sent,
+                'package' => $this->serializePackage($item->fresh(), $hub),
+            ],
+        ], $sent ? 200 : 502);
     }
 
     /**
@@ -604,7 +738,31 @@ class HubController extends Controller
         $hub = $request->user()->warehouse;
         $limit = (int) ($validated['limit'] ?? 20);
 
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'activities' => $this->recentActivities($hub, $limit),
+            ],
+        ]);
+    }
+
+    /**
+     * The hub's most recent movement, newest first.
+     *
+     * Derived from the tracking rows already written for the hub's parcels, so
+     * the feed reflects what actually happened rather than a parallel log that
+     * could drift. An account that has done nothing yet gets an empty array,
+     * which the app renders as an empty state.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function recentActivities(Warehouse $hub, int $limit): array
+    {
         $itemIds = ShipmentItem::query()->where('hub_id', $hub->id)->pluck('id');
+
+        if ($itemIds->isEmpty()) {
+            return [];
+        }
 
         $rows = ShipmentItemTracking::query()
             ->whereIn('shipment_item_id', $itemIds)
@@ -617,21 +775,16 @@ class HubController extends Controller
             ->whereIn('id', $rows->pluck('shipment_item_id')->unique())
             ->pluck('tracking_code', 'id');
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'activities' => $rows->map(fn (ShipmentItemTracking $row) => [
-                    'id' => (string) $row->id,
-                    'package_id' => (string) $row->shipment_item_id,
-                    'tracking_code' => $codes[$row->shipment_item_id] ?? null,
-                    'status' => $row->status,
-                    'title' => ItemStatus::tryFrom((string) $row->status)?->label() ?? (string) $row->status,
-                    'body' => $row->notes,
-                    'location' => $row->location,
-                    'created_at' => $row->created_at?->toIso8601String(),
-                ])->values(),
-            ],
-        ]);
+        return $rows->map(fn (ShipmentItemTracking $row) => [
+            'id' => (string) $row->id,
+            'package_id' => (string) $row->shipment_item_id,
+            'tracking_code' => $codes[$row->shipment_item_id] ?? null,
+            'status' => $row->status,
+            'title' => ItemStatus::tryFrom((string) $row->status)?->label() ?? (string) $row->status,
+            'body' => $row->notes,
+            'location' => $row->location,
+            'created_at' => $row->created_at?->toIso8601String(),
+        ])->values()->all();
     }
 
     /**
@@ -713,6 +866,29 @@ class HubController extends Controller
             'name' => $hub?->name,
             'code' => $hub?->code,
             'contact_phone' => $hub?->contact_phone,
+        ];
+    }
+
+    /**
+     * The signed-in hub agent, as the app should show them.
+     *
+     * `photo_path` is stored at sign-up/upload but was never turned into a URL,
+     * which is why the hub header had to hardcode an avatar. The app falls back
+     * to initials when this is null.
+     */
+    private function serializeUser(User $user): array
+    {
+        return [
+            'id' => (string) $user->id,
+            'name' => $user->name,
+            'phone' => $user->phone,
+            'email' => $user->email,
+            'profile_photo_url' => $user->photo_path
+                ? app(StorageService::class)->getUrl($user->photo_path)
+                : null,
+            // Handy for a header that shows the posting without a second call.
+            'hub_name' => $user->warehouse?->name,
+            'hub_code' => $user->warehouse?->code,
         ];
     }
 

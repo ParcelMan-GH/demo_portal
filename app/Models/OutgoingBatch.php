@@ -21,6 +21,17 @@ class OutgoingBatch extends Model
     public const STATUS_RECEIVED = 'received';
 
     /**
+     * The transporter has handed the batch over and the hub has checked it in.
+     *
+     * The value is `arrived` rather than `received_at_hub` on purpose: it is what
+     * production rows already carry, and it is deliberately *not* in
+     * CLOSED_STATUSES — a batch sitting at the hub is precisely the one that
+     * still has to go on a bus, so it must stay in the dispatchable list.
+     * `received` would retire it from that list the moment it was unpacked.
+     */
+    public const STATUS_ARRIVED_AT_HUB = 'arrived';
+
+    /**
      * Statuses that mean the batch has already left and can take no more work.
      *
      * Deliberately a deny-list. The first version of this checked for `'open'`,

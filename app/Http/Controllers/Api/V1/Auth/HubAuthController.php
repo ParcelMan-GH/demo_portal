@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\StorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -95,6 +96,11 @@ class HubAuthController extends Controller
                 'hub_id' => $user->warehouse_id,
                 'hub_name' => $user->warehouse?->name,
                 'hub_code' => $user->warehouse?->code,
+                // Sent at login too, so the header is right before the
+                // dashboard call lands. Null means the app shows initials.
+                'profile_photo_url' => $user->photo_path
+                    ? app(StorageService::class)->getUrl($user->photo_path)
+                    : null,
             ],
         ]);
     }
