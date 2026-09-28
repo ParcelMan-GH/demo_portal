@@ -7,6 +7,7 @@ use App\Models\OutgoingBatch;
 use App\Models\OutgoingBatchAssignmentEvent;
 use App\Models\ShipmentItem;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Places a package into the outgoing batch for its destination.
@@ -110,16 +111,40 @@ class OutgoingBatchAutoAssignmentService
             $created = false;
 
             if (! $batch) {
-                $batch = OutgoingBatch::create([
+                $attributes = [
                     // Numbering lives on the model now, so every caller issues
                     // the same shape and checks for a collision.
                     'batch_number' => OutgoingBatch::generateBatchNumber(),
                     'delivery_region_id' => $regionId,
                     'delivery_district_id' => $districtId,
                     'status' => OutgoingBatch::STATUS_OPEN,
-                ]);
+                ];
+
+                // Guarded: a deployment that has not yet run the migration must
+                // still be able to batch.
+                if (Schema::hasColumn('outgoing_batches', 'destination_warehouse_id')) {
+                    $attributes['destination_warehouse_id'] = OutgoingBatch::resolveDestinationWarehouseId(
+                        (int) $regionId,
+                        (int) $districtId
+                    );
+                }
+
+                $batch = OutgoingBatch::create($attributes);
 
                 $created = true;
+            } elseif (
+                Schema::hasColumn('outgoing_batches', 'destination_warehouse_id')
+                && empty($batch->destination_warehouse_id)
+            ) {
+                // An open batch formed before this column existed is reused rather
+                // than recreated, so without this it would stay permanently
+                // unassigned and its parcels could never count as bus work.
+                $batch->forceFill([
+                    'destination_warehouse_id' => OutgoingBatch::resolveDestinationWarehouseId(
+                        (int) $regionId,
+                        (int) $districtId
+                    ),
+                ])->save();
             }
 
             $locked->forceFill([

@@ -63,9 +63,10 @@ class AdminTransportManifestController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'delivery_region_id'   => ['required', 'integer'],
-            'delivery_district_id' => ['required', 'integer'],
-            'destination_type'     => ['nullable', 'string', 'in:' . implode(',', array_column(BatchDestinationType::toArray(), 'value'))],
+            'delivery_region_id'       => ['required', 'integer'],
+            'delivery_district_id'     => ['required', 'integer'],
+            'destination_type'         => ['nullable', 'string', 'in:' . implode(',', array_column(BatchDestinationType::toArray(), 'value'))],
+            'destination_warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
         ]);
 
         $attributes = [
@@ -81,6 +82,18 @@ class AdminTransportManifestController extends Controller
         // turned batch creation into a 500 until the migration was applied.
         if (Schema::hasColumn('outgoing_batches', 'destination_type')) {
             $attributes['destination_type'] = $validated['destination_type'] ?? null;
+        }
+
+        // Same guard, same reason: only write the column once it exists.
+        if (Schema::hasColumn('outgoing_batches', 'destination_warehouse_id')) {
+            // An explicit choice wins; otherwise work it out from where the batch
+            // is going. Null when that region has no hub, which is the honest
+            // answer rather than pointing at a plausible-looking wrong hub.
+            $attributes['destination_warehouse_id'] = $validated['destination_warehouse_id']
+                ?? OutgoingBatch::resolveDestinationWarehouseId(
+                    (int) $validated['delivery_region_id'],
+                    (int) $validated['delivery_district_id']
+                );
         }
 
         $batch = OutgoingBatch::create($attributes);
@@ -404,24 +417,14 @@ class AdminTransportManifestController extends Controller
 
     protected function resolveDestinationWarehouse(OutgoingBatch $batch): ?Warehouse
     {
-        $base = Warehouse::query()
-            ->where('is_active', true)
-            ->where('region_id', $batch->delivery_region_id);
+        // The rule lives on the model now, so a batch and the manifest raised for
+        // it cannot name different destinations.
+        $id = OutgoingBatch::resolveDestinationWarehouseId(
+            $batch->delivery_region_id,
+            $batch->delivery_district_id
+        );
 
-        // Older databases do not have every warehouse column, so filter only when present.
-        if (Schema::hasColumn('warehouses', 'type')) {
-            $base->whereIn('type', ['destination', 'both']);
-        }
-
-        if (Schema::hasColumn('warehouses', 'district_id') && $batch->delivery_district_id) {
-            $sameDistrict = (clone $base)->where('district_id', $batch->delivery_district_id)->orderBy('id')->first();
-
-            if ($sameDistrict) {
-                return $sameDistrict;
-            }
-        }
-
-        return (clone $base)->orderBy('id')->first();
+        return $id ? Warehouse::query()->find($id) : null;
     }
 
     // ==========================================

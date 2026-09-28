@@ -6,6 +6,7 @@ use App\Enums\BatchDestinationType;
 use App\Helpers\CodeResolver;
 use App\Models\PlatformSetting;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -87,6 +88,7 @@ class OutgoingBatch extends Model
         'batch_number',
         'delivery_region_id',
         'delivery_district_id',
+        'destination_warehouse_id',
         'destination_type',
         'status',
         'transport_driver_id',
@@ -98,6 +100,54 @@ class OutgoingBatch extends Model
     public function shipmentItems(): HasMany
     {
         return $this->hasMany(ShipmentItem::class);
+    }
+
+    /**
+     * The hub this batch is going to, when it is going to one.
+     */
+    public function destinationWarehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class, 'destination_warehouse_id');
+    }
+
+    /**
+     * The hub that serves a destination, from its region and district.
+     *
+     * One definition, used both when a batch is first formed and when the
+     * transport manifest for it is raised, so the batch and its manifest can
+     * never name different destinations.
+     *
+     * Prefers a hub in the same district, then any active hub in the region, and
+     * returns null when the region has no hub — which is the honest answer, not a
+     * guess. A caller must treat null as "no inter-hub transfer recorded" rather
+     * than falling back to something plausible.
+     */
+    public static function resolveDestinationWarehouseId(?int $regionId, ?int $districtId): ?int
+    {
+        if (empty($regionId)) {
+            return null;
+        }
+
+        $base = Warehouse::query()
+            ->where('is_active', true)
+            ->where('region_id', $regionId);
+
+        // Some deployments record what a warehouse is for. Only consider the ones
+        // that can receive; guarded because the column is not everywhere, and
+        // filtering on a missing column would turn batch creation into an error.
+        if (Schema::hasColumn('warehouses', 'type')) {
+            $base->whereIn('type', ['destination', 'both']);
+        }
+
+        if ($districtId) {
+            $sameDistrict = (clone $base)->where('district_id', $districtId)->orderBy('id')->first();
+
+            if ($sameDistrict) {
+                return (int) $sameDistrict->id;
+            }
+        }
+
+        return ($first = (clone $base)->orderBy('id')->first()) ? (int) $first->id : null;
     }
 
     /**

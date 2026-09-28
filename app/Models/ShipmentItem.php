@@ -158,11 +158,12 @@ class ShipmentItem extends Model
      *     cannot be counted. That is the bug this replaced: the tile used to count
      *     `dispatched_to_bus` itself, meaning the opposite of its own label and
      *     reading zero in normal operation;
-     *  3. it is *assigned to a different hub*. A parcel is only bus work when the
-     *     parcel itself says so, by being in a sort batch whose destination
-     *     warehouse is another hub. `destination_warehouse_id` is the one place
-     *     this system records a target hub, and it already uses NULL to mean
-     *     "local, no inter-hub transfer" — which is why an unassigned parcel is
+     *  3. it is *assigned to a different hub*, by either kind of batch. A parcel
+     *     may be allocated to a sort batch (`sort_batches`) or attached to an
+     *     outgoing batch (`outgoing_batches`); both now carry a
+     *     `destination_warehouse_id`, and either one naming a hub other than this
+     *     one makes the parcel bus work. That column uses NULL to mean "no
+     *     inter-hub transfer recorded", which is why an unassigned parcel is
      *     excluded rather than guessed at.
      *
      * Comparing hubs rather than regions is the point: two hubs can share a region
@@ -178,9 +179,17 @@ class ShipmentItem extends Model
         return $query->atHub($hub->id)
             ->whereIn('status', array_map(fn (ItemStatus $status) => $status->value, self::AT_HUB_STATUSES))
             ->whereDoesntHave('busHandoffs')
-            ->whereHas('sortBatches', function ($batch) use ($hub) {
-                $batch->whereNotNull('sort_batches.destination_warehouse_id')
-                    ->where('sort_batches.destination_warehouse_id', '!=', $hub->id);
+            ->where(function ($target) use ($hub) {
+                // A sort batch the parcel was allocated to...
+                $target->whereHas('sortBatches', function ($batch) use ($hub) {
+                    $batch->whereNotNull('sort_batches.destination_warehouse_id')
+                        ->where('sort_batches.destination_warehouse_id', '!=', $hub->id);
+                })
+                    // ...or an outgoing batch it was collected into.
+                    ->orWhereHas('outgoingBatch', function ($batch) use ($hub) {
+                        $batch->whereNotNull('outgoing_batches.destination_warehouse_id')
+                            ->where('outgoing_batches.destination_warehouse_id', '!=', $hub->id);
+                    });
             });
     }
 
