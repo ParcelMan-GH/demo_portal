@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Driver;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -78,8 +79,29 @@ class DriverProfileService
      */
     public function updateProfile(Driver $driver, array $data, Request $request): array
     {
-        // Update allowed fields
-        $allowedFields = ['name', 'phone', 'vehicle_type', 'vehicle_number', 'license_number', 'base_location'];
+        /*
+         * The fields a driver may change about themselves.
+         *
+         * Drivers live in their own `drivers` table (App\Models\Driver), not in
+         * `users` — so this list has to match the `drivers` schema, which is:
+         * name, email, phone, vehicle_type, vehicle_number, license_number,
+         * base_location, photo_path, status, task_capabilities.
+         *
+         * `email` is the one addition: the profile screen has always collected
+         * it and login accepts an email, but the field was never writable, so an
+         * email edit looked saved and then reverted.
+         *
+         * Note what is deliberately absent: make_model, license_plate and
+         * max_capacity are columns on `users`, NOT on `drivers`. The vehicle
+         * screen collects all three, and no driver column can hold them — that is
+         * a product gap, not a missing line here. Filtering against the schema
+         * keeps a wrong name from becoming a 500.
+         */
+        $writable = ['name', 'phone', 'email', 'vehicle_type', 'vehicle_number', 'license_number', 'base_location'];
+        $allowedFields = array_values(array_filter(
+            $writable,
+            fn (string $field) => Schema::hasColumn($driver->getTable(), $field)
+        ));
 
         foreach ($allowedFields as $field) {
             if (isset($data[$field])) {

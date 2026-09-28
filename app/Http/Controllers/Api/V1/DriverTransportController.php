@@ -205,18 +205,37 @@ class DriverTransportController extends Controller
             $driver = $this->actingDriver($request);
             $search = trim($request->query('search', ''));
 
-            // Dynamically detect column name (driver_id vs transporter_id)
-            $driverCol = Schema::hasColumn('transport_manifests', 'driver_id') ? 'driver_id' : 'transporter_id';
+            // The manifest's driver column.
+            //
+            // This previously guessed `driver_id`, then fell back to
+            // `transporter_id` — and neither exists on transport_manifests. The
+            // real column is `assigned_driver_id`, so the fallback was always
+            // taken and EVERY call to this endpoint died with
+            // "Unknown column 'transporter_id'" (HTTP 500). The probe stays, with
+            // the real column first, so it keeps working if the schema moves.
+            $driverCol = collect(['assigned_driver_id', 'driver_id', 'transporter_id'])
+                ->first(fn ($col) => Schema::hasColumn('transport_manifests', $col))
+                ?? 'assigned_driver_id';
 
-            // Query dispatches assigned to this driver OR unassigned in the pool
+            // The active view deliberately includes unclaimed work, so a driver
+            // can see a batch waiting to be claimed. History must not: it is the
+            // record of what this driver actually did.
+            $isHistory = $request->query('filter') === 'history';
+
             $query = TransportManifest::query()
-                ->with(['originWarehouse', 'destinationWarehouse'])
-                ->where(function ($q) use ($driver, $driverCol) {
+                ->with(['originWarehouse', 'destinationWarehouse']);
+
+            if ($isHistory) {
+                $query->where($driverCol, $driver->id)
+                      ->whereIn('status', TransportManifest::STATUSES_HISTORY);
+            } else {
+                $query->where(function ($q) use ($driver, $driverCol) {
                     $q->where($driverCol, $driver->id)
                       ->orWhereNull($driverCol)
                       ->orWhere($driverCol, 0)
                       ->orWhere($driverCol, '');
                 });
+            }
 
             if ($search !== '') {
                 $query->where(function ($q) use ($search) {
@@ -261,8 +280,10 @@ class DriverTransportController extends Controller
             }
 
             // Calculate transporter metrics
+            // 'completed' is not one of this model's statuses, so it matched
+            // nothing; 'received' is the real end of the journey.
             $drivesMade = TransportManifest::where($driverCol, $driver->id)
-                ->whereIn('status', ['in_transit', 'completed', 'arrived'])
+                ->whereIn('status', TransportManifest::STATUSES_HISTORY)
                 ->count();
             $totalBatches = TransportManifest::where($driverCol, $driver->id)->count();
             $exceptions = 0;
@@ -284,7 +305,14 @@ class DriverTransportController extends Controller
                     'package_count' => $m->items_count ?? ($m->relationLoaded('items') ? $m->items->count() : 0),
                     'status' => str_replace('_', ' ', ucfirst($m->status ?? 'pending')),
                     'status_raw' => $m->status ?? 'pending',
-                    'transporter_id' => $m->{$driverCol} ?? $driver->id,
+                    // Was `$m->{$driverCol} ?? $driver->id`, which reported the
+                    // CALLER's id for an unassigned manifest — making unclaimed
+                    // pool work indistinguishable from a driver's own batch. Both
+                    // values are now reported truthfully so the client can tell
+                    // them apart.
+                    'assigned_driver_id' => $m->{$driverCol},
+                    'is_assigned_to_me' => (int) $m->{$driverCol} === (int) $driver->id,
+                    'transporter_id' => $m->{$driverCol},
                 ];
             });
 

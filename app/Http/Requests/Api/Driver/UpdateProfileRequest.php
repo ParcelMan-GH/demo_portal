@@ -17,8 +17,12 @@ class UpdateProfileRequest extends FormRequest
     public function rules(): array
     {
         return [
+            // Aligned with the `drivers` table — see DriverProfileService::updateProfile.
+            // `email` is added because the profile screen collects it and login
+            // accepts it; the rest were already correct.
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'phone' => ['sometimes', 'required', 'string', 'max:20'],
+            'email' => ['sometimes', 'nullable', 'email', 'max:255'],
             'vehicle_type' => ['sometimes', 'required', Rule::in(['motorcycle', 'car', 'van', 'truck'])],
             'vehicle_number' => ['sometimes', 'nullable', 'string', 'max:50'],
             'license_number' => ['sometimes', 'nullable', 'string', 'max:50'],

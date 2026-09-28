@@ -20,6 +20,25 @@ class TransportManifest extends Model
     public const STATUS_RECEIVED = 'received';
     public const STATUS_CANCELLED = 'cancelled';
 
+    /**
+     * Statuses that mean the journey is over.
+     *
+     * Anything else (assigned, loading, in_transit) is still actionable, so it
+     * belongs in the active view rather than in history.
+     */
+    public const STATUSES_HISTORY = [
+        self::STATUS_ARRIVED,
+        self::STATUS_RECEIVED,
+        self::STATUS_CANCELLED,
+    ];
+
+    /** Statuses that are still in the driver's hands. */
+    public const STATUSES_ACTIVE = [
+        self::STATUS_ASSIGNED,
+        self::STATUS_LOADING,
+        self::STATUS_IN_TRANSIT,
+    ];
+
     protected $fillable = [
         'manifest_number',
         'sort_batch_id',
