@@ -1,25 +1,32 @@
 @php
     /*
-     * The printable sheet a hub prints from the Outgoing Batches table.
+     * The box label a hub prints for a batch.
      *
-     * Deliberately one label per page at a fixed 100mm x 150mm, matching how the
-     * container label already prints. Printing the whole batch as a grid would
-     * need the staff to match labels to parcels by hand; one-per-page means a
-     * label can be peeled and stuck without counting.
+     * ONE page, deliberately. A batch travels as a single box, so the label goes
+     * on that box — printing a page per parcel produced a three-page sheet for a
+     * two-parcel batch, and two of those pages had nothing to stick to.
      *
-     * Everything is black on white and drawn with rules rather than fills, so it
-     * survives a thermal printer and a photocopier.
+     * The barcode is the batch code, which is what the driver's scanner sees and
+     * what loads the box as a whole. The parcel barcodes are listed underneath so
+     * the contents of the box can be checked against the sheet without printing
+     * them again — capped, because a label that overflows the page is no use on a
+     * carton.
+     *
+     * Black on white with rules rather than fills, so it survives a thermal
+     * printer and a photocopier.
      */
     $createdAt = optional($batch->created_at ?? null)->format('d M Y, H:i');
     $packagesTotal = count($parcels);
     $shortfall = $packagesTotal - $labelledCount;
+    $barcodes = collect($parcels)->pluck('barcode')->filter()->values();
+    $shown = $barcodes->take(8);
 @endphp
 <!doctype html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Batch Labels - {{ $code }}</title>
+    <title>Label {{ $code }}</title>
     <style>
         @page { size: 100mm 150mm; margin: 0; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,11 +44,8 @@
             display: flex;
             flex-direction: column;
             gap: 3mm;
-            page-break-after: always;
             overflow: hidden;
         }
-        .sheet:last-child { page-break-after: auto; }
-
         .head {
             display: flex;
             align-items: baseline;
@@ -60,8 +64,6 @@
             text-align: center;
             word-break: break-all;
         }
-        .code--parcel { font-size: 5.4mm; }
-
         .barcode { display: flex; justify-content: center; padding: 1mm 0; }
         .barcode svg { max-width: 100%; height: auto; }
 
@@ -79,6 +81,17 @@
         .fact-label { font-size: 2.2mm; font-weight: 800; letter-spacing: 0.4mm; color: #475569; text-transform: uppercase; }
         .fact-value { font-size: 3.2mm; font-weight: 800; }
 
+        .contents {
+            border-top: 0.3mm solid #94a3b8;
+            padding-top: 2mm;
+        }
+        .contents-list {
+            font-family: 'Menlo', 'Consolas', monospace;
+            font-size: 2.4mm;
+            line-height: 1.5;
+            word-break: break-all;
+        }
+
         .note {
             margin-top: auto;
             border-top: 0.3mm dashed #64748b;
@@ -91,7 +104,6 @@
 </head>
 <body>
 
-    {{-- Master batch label --}}
     <div class="sheet">
         <div class="head">
             <span class="brand">PARCELMAN EXPRESS</span>
@@ -132,66 +144,30 @@
             </div>
         </div>
 
+        @if ($barcodes->isNotEmpty())
+            {{-- One label covers the box, so the contents are listed here instead
+                 of being printed as pages of their own. --}}
+            <div class="contents">
+                <div class="fact-label" style="margin-bottom:1mm;">Parcel barcodes in this box</div>
+                <div class="contents-list">
+                    {{ $shown->implode(' · ') }}@if ($barcodes->count() > $shown->count())
+                        · +{{ $barcodes->count() - $shown->count() }} more
+                    @endif
+                </div>
+            </div>
+        @endif
+
         <div class="note">
-            @if ($shortfall > 0)
-                {{ $shortfall }} of {{ $packagesTotal }} packages have no warehouse label yet, so no
-                parcel label is printed for them. They must be receipted at the warehouse before a
-                driver can load this batch.
+            @if ($packagesTotal === 0)
+                This batch has no packages yet.
+            @elseif ($shortfall > 0)
+                {{ $shortfall }} of {{ $packagesTotal }} packages have no warehouse label yet.
+                Receipt them at the warehouse before this box is despatched.
             @else
-                Every package in this batch carries a scannable label.
+                This label covers the whole batch. Scan it to load the box.
             @endif
         </div>
     </div>
-
-    {{-- One label per parcel --}}
-    @forelse ($parcels as $index => $parcel)
-        <div class="sheet">
-            <div class="head">
-                <span class="brand">PARCELMAN EXPRESS</span>
-                <span class="kind">PARCEL {{ $index + 1 }} / {{ $packagesTotal }}</span>
-            </div>
-
-            @if ($parcel['barcode'])
-                <div class="code code--parcel">{{ $parcel['barcode'] }}</div>
-                <div class="barcode">{!! $parcel['barcode_svg'] !!}</div>
-            @else
-                <div class="code code--parcel">{{ $parcel['tracking_code'] ?? '—' }}</div>
-                <div class="note" style="margin-top:0; border-top:0;">
-                    {{ $parcel['note'] ?? 'No printable label for this parcel.' }}
-                </div>
-            @endif
-
-            <div class="facts">
-                <div>
-                    <div class="fact-label">Tracking</div>
-                    <div class="fact-value">{{ $parcel['tracking_code'] ?? '—' }}</div>
-                </div>
-                <div>
-                    <div class="fact-label">Batch</div>
-                    <div class="fact-value">{{ $code }}</div>
-                </div>
-                <div>
-                    <div class="fact-label">Destination</div>
-                    <div class="fact-value">{{ $destination }}</div>
-                </div>
-                <div>
-                    <div class="fact-label">Origin</div>
-                    <div class="fact-value">{{ $origin ?? 'Not recorded' }}</div>
-                </div>
-            </div>
-        </div>
-    @empty
-        <div class="sheet">
-            <div class="head">
-                <span class="brand">PARCELMAN EXPRESS</span>
-                <span class="kind">NO PARCELS</span>
-            </div>
-            <div class="note" style="margin-top:auto; border-top:0;">
-                This batch has no packages yet, so there are no parcel labels to print. Add packages
-                to the batch first.
-            </div>
-        </div>
-    @endforelse
 
 </body>
 </html>

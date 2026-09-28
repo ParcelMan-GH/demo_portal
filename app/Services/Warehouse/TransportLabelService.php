@@ -9,16 +9,19 @@ use Illuminate\Support\Collection;
  * Parcel labels for a batch on its way out.
  *
  * Two jobs that have to happen together. Rendering the sheet is obvious; the
- * other is creating the `warehouse_receipt_item_labels` rows. Departure is
- * refused with "Manifest is not ready to depart" until every parcel carries one,
- * because that row is what the driver's scanner matches to load. Printing the
- * batch label at the hub is the moment the warehouse commits to those parcels,
- * so it is the right moment to create them — otherwise staff print a label and
- * the driver is still blocked.
+ * other is creating the `warehouse_receipt_item_labels` rows. Having a label on
+ * every parcel is what marks the box as packed and sealed, and departure is
+ * gated on that — the label rows are the record of it, so a batch printed at the
+ * hub can be taken by a driver without anyone re-scanning the contents.
  *
- * Shared by the admin Outgoing Batches screen and the warehouse one, which list
- * different models (OutgoingBatch and TransportManifest) but label the same
- * thing: the shipment items riding on the batch.
+ * The sheet is ONE page: the batch label, for the box, with the parcel barcodes
+ * listed underneath. A batch travels as a single box, so a page per parcel gave
+ * a three-page sheet for a two-parcel batch and two of those pages had nothing
+ * to stick to.
+ *
+ * Shared by the admin Outgoing Batches screen and any other screen that labels a
+ * batch, which may list different models (OutgoingBatch and TransportManifest)
+ * but label the same thing: the shipment items riding on the batch.
  */
 class TransportLabelService
 {

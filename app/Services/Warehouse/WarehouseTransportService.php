@@ -20,6 +20,7 @@ use App\Models\TransportManifestLabelScan;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
+use App\Models\WarehouseReceiptItem;
 use App\Models\WarehouseReceiptItemLabel;
 use App\Services\DriverWorkloadService;
 use App\Services\RiderAssignmentAuditService;
@@ -2052,17 +2053,89 @@ class WarehouseTransportService
         });
     }
 
+    /**
+     * Has every parcel in this batch been labelled at the warehouse?
+     *
+     * That is the signal that the box was packed and sealed, which is what
+     * actually has to be true before a batch can leave. Checked per parcel
+     * rather than counted, because one parcel can have more than one receipt if
+     * it was received in parts.
+     */
+    private function boxHasBeenLabelled(TransportManifest $manifest): bool
+    {
+        $shipmentItemIds = $manifest->items()->pluck('shipment_item_id');
+
+        if ($shipmentItemIds->isEmpty()) {
+            return false;
+        }
+
+        foreach ($shipmentItemIds as $shipmentItemId) {
+            $labelled = WarehouseReceiptItem::query()
+                ->where('shipment_item_id', $shipmentItemId)
+                ->whereHas('labels')
+                ->exists();
+
+            if (! $labelled) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Mark the batch's boxes loaded.
+     *
+     * A sealed, labelled box is loaded the moment the driver takes it; there is
+     * nothing left to scan into it.
+     */
+    private function loadPreparedBoxes(TransportManifest $manifest, Driver $driver): void
+    {
+        foreach ($manifest->containers as $container) {
+            if ($container->items->isEmpty()) {
+                continue;
+            }
+
+            if ($container->status === TransportContainer::STATUS_LOADED) {
+                continue;
+            }
+
+            $this->markContainerLoaded($container, $driver);
+        }
+    }
+
     public function driverDepart(TransportManifest $manifest, Driver $driver): array
     {
         if ((int) $manifest->assigned_driver_id !== (int) $driver->id) {
             return ['success' => false, 'message' => 'Manifest not found.'];
         }
 
-        if ($manifest->status !== TransportManifest::STATUS_LOADING) {
-            return ['success' => false, 'message' => 'Manifest is not ready to depart.'];
+        if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
+            return ['success' => false, 'message' => 'This batch has already left the warehouse.'];
+        }
+
+        /*
+         * A batch travels as one sealed box with one label on it, so the gate is
+         * whether that box was labelled at the warehouse — not whether the driver
+         * has scanned anything. The app has no per-parcel scanning step, so the
+         * old status-only guard left a driver who had scanned nothing with
+         * "Manifest is not ready to depart." and no way forward.
+         */
+        if (! $this->boxHasBeenLabelled($manifest)) {
+            return [
+                'success' => false,
+                'message' => 'All parcels in this batch must be receipted and labeled at the warehouse before departing.',
+            ];
+        }
+
+        // Taking a prepared box IS the loading step: the warehouse sealed and
+        // labelled it, and the driver is not going to open it on the roadside.
+        if ($manifest->status === TransportManifest::STATUS_ASSIGNED) {
+            $manifest->update(['status' => TransportManifest::STATUS_LOADING]);
         }
 
         $this->ensureDefaultContainer($manifest->fresh('items'));
+        $this->loadPreparedBoxes($manifest->fresh('containers.items.manifestItem'), $driver);
 
         $notLoadedCount = $manifest->containers()
             ->whereHas('items')
