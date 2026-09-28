@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\V1\VendorLocationController;
 use App\Http\Controllers\Api\V1\VendorNotificationController;
 use App\Http\Controllers\Api\V1\VendorPickupVehicleTypeController;
 use App\Http\Controllers\Api\V1\VendorProfileController;
+use App\Http\Controllers\Api\V1\UserProfileController;
 use App\Http\Controllers\Api\V1\VendorShipmentController;
 use App\Http\Controllers\Api\V1\VendorShipmentItemController;
 use Illuminate\Support\Facades\Route;
@@ -100,6 +101,14 @@ Route::prefix('v1/hub')->group(function () {
 });
 
 // API v1 - Agent Operations
+// The signed-in user's own profile, across every app. Not role-scoped on
+// purpose: an avatar belongs to the person, and a hub agent, a bus handoff agent
+// and a vendor are all the same `users` row.
+Route::prefix('v1/user')->middleware('auth:sanctum')->group(function () {
+    Route::get('me', [UserProfileController::class, 'me']);
+    Route::post('profile-photo', [UserProfileController::class, 'updatePhoto']);
+});
+
 Route::prefix('v1/agent')->middleware(['auth:sanctum'])->group(function () {
     Route::post('/parcels/scan-claim', [AgentParcelController::class, 'scanClaim']);
     Route::post('/parcels/claim', [AgentParcelController::class, 'scanClaim']);
