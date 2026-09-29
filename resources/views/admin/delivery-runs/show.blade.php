@@ -75,22 +75,31 @@ $addTimelineEvent($run->completed_at, 'Run completed', 'emerald', $run->assigned
 $deliveryTimelineEvents = $deliveryTimelineEvents->sortByDesc(fn ($event) => sprintf('%03d-%s', $event['order'], $event['at']->timestamp))->values();
 $latestTimelineEvent = $deliveryTimelineEvents->first();
 
+/*
+ * Light-background pills.
+ *
+ * These were built for the header's old near-black panel, where `text-amber-300`
+ * and friends read fine. On the white header card those tones all but vanish, so
+ * each state now uses a 100-level fill with a 700-level label. "Out for delivery"
+ * is the state that means a rider is on the road, so it takes the brand orange
+ * rather than a generic amber.
+ */
 $statusColors = match($run->status) {
-    'draft'               => 'bg-slate-500/20 text-slate-300',
-    'assigned'            => 'bg-blue-500/20 text-blue-300',
-    'out_for_delivery'    => 'bg-amber-500/20 text-amber-300',
-    'partially_delivered' => 'bg-orange-500/20 text-orange-300',
-    'completed'           => 'bg-emerald-500/20 text-emerald-300',
-    'cancelled'           => 'bg-red-500/20 text-red-300',
-    default               => 'bg-slate-500/20 text-slate-300',
+    'draft'               => 'bg-slate-100 text-slate-600',
+    'assigned'            => 'bg-blue-100 text-blue-700',
+    'out_for_delivery'    => 'bg-[#D95A11]/10 text-[#B84C0B]',
+    'partially_delivered' => 'bg-orange-100 text-orange-700',
+    'completed'           => 'bg-emerald-100 text-emerald-700',
+    'cancelled'           => 'bg-red-100 text-red-700',
+    default               => 'bg-slate-100 text-slate-600',
 };
 $dotColors = match($run->status) {
     'draft'               => 'bg-slate-400',
-    'assigned'            => 'bg-blue-400',
-    'out_for_delivery'    => 'bg-amber-400',
-    'partially_delivered' => 'bg-orange-400',
-    'completed'           => 'bg-emerald-400',
-    'cancelled'           => 'bg-red-400',
+    'assigned'            => 'bg-blue-500',
+    'out_for_delivery'    => 'bg-[#D95A11]',
+    'partially_delivered' => 'bg-orange-500',
+    'completed'           => 'bg-emerald-500',
+    'cancelled'           => 'bg-red-500',
     default               => 'bg-slate-400',
 };
 $stopStatusColors = [
@@ -708,15 +717,15 @@ $itemStatusColors = [
     >
 
     <!-- Hero / Header Card -->
-    <section class="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 shadow-xl shadow-slate-300/20">
-        <div class="pointer-events-none absolute inset-0 overflow-hidden rounded-[2rem]">
-            <div class="absolute inset-y-0 right-0 w-2/3 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.25),transparent_58%)]"></div>
-            <div class="absolute inset-y-0 left-0 w-1/2 bg-[radial-gradient(circle_at_bottom_left,rgba(15,23,42,0.95),transparent_70%)]"></div>
-        </div>
-
-        <div class="relative p-5 sm:p-7">
+    {{--
+        The header is a light card. It used to be a near-black panel with two
+        radial glows painted over it, which had to fight every label inside it for
+        contrast; nothing here needs a dark surface to be readable.
+    --}}
+    <section class="rounded-[2rem] border border-slate-200/70 bg-white p-5 shadow-sm shadow-slate-200/40 sm:p-7">
+        <div>
             <div class="flex flex-wrap items-start justify-between gap-3">
-                <a href="{{ $deliveryRunRoutes['indexUrl'] }}" class="inline-flex h-11 w-auto shrink-0 items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 text-sm font-black text-slate-100 transition hover:bg-white/15">
+                <a href="{{ $deliveryRunRoutes['indexUrl'] }}" class="inline-flex h-11 w-auto shrink-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-600 transition hover:border-[#D95A11]/40 hover:text-[#D95A11]">
                     <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                     </svg>
@@ -732,7 +741,7 @@ $itemStatusColors = [
                         <button
                             type="button"
                             @@click="openAssignRiderModal()"
-                            class="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-orange-400/45 bg-orange-500/15 px-3 text-xs font-black text-orange-100 transition hover:bg-orange-500/25"
+                            class="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-[#D95A11]/30 bg-[#D95A11]/5 px-3 text-xs font-black text-[#B84C0B] transition hover:bg-[#D95A11]/10"
                         >
                             <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7Z"/>
@@ -743,7 +752,7 @@ $itemStatusColors = [
                     @if($run->sortBatch)
                         <a
                             href="{{ $deliveryRunRoutes['sortBatchUrl'] }}"
-                            class="inline-flex h-9 max-w-full items-center rounded-full border border-orange-400/45 bg-orange-500/15 px-3 text-xs font-black text-orange-100 transition hover:bg-orange-500/25 sm:max-w-[420px]"
+                            class="inline-flex h-9 max-w-full items-center rounded-full border border-[#D95A11]/30 bg-[#D95A11]/5 px-3 text-xs font-black text-[#B84C0B] transition hover:bg-[#D95A11]/10 sm:max-w-[420px]"
                             title="Open batch {{ $run->sortBatch->batch_number }}"
                         >
                             <span class="truncate">Batch: {{ $run->sortBatch->batch_number }}</span>
@@ -753,7 +762,7 @@ $itemStatusColors = [
                         <button
                             type="button"
                             @@click="showNotesModal = true"
-                            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-slate-100 transition hover:bg-white/15"
+                            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-[#D95A11]/40 hover:text-[#D95A11]"
                             title="View run notes"
                         >
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -767,28 +776,28 @@ $itemStatusColors = [
             <div class="relative mt-7 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div class="min-w-0 lg:max-w-[760px] lg:shrink">
                 <div class="flex min-w-0 items-start gap-4 sm:gap-5">
-                    <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-orange-600 text-white shadow-xl shadow-orange-600/25 sm:h-24 sm:w-24">
+                    <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-[#D95A11]/10 text-[#D95A11] sm:h-24 sm:w-24">
                         <svg class="h-9 w-9 sm:h-12 sm:w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 17a2 2 0 11-4 0 2 2 0 014 0Zm10 0a2 2 0 11-4 0 2 2 0 014 0ZM3 7h11v10H9m-6 0V7m11 10h1m4 0h2v-5l-3-4h-4"/>
                         </svg>
                     </div>
 
                     <div class="min-w-0">
-                        <p class="text-[11px] font-black uppercase tracking-[0.22em] text-orange-200">Delivery Run Workspace</p>
-                        <h1 class="mt-2 max-w-4xl break-words text-3xl font-black leading-tight text-white sm:text-5xl xl:text-4xl 2xl:text-5xl">{{ $run->run_number }}</h1>
-                        <div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-bold text-slate-300 sm:text-base">
+                        <p class="text-[11px] font-black uppercase tracking-[0.22em] text-[#D95A11]">Delivery Run Workspace</p>
+                        <h1 class="mt-2 max-w-4xl break-words text-3xl font-black leading-tight tracking-tight text-slate-900 sm:text-5xl xl:text-4xl 2xl:text-5xl">{{ $run->run_number }}</h1>
+                        <div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-semibold text-slate-500 sm:text-base">
                             @unless($hideRunWarehouseMeta)
                                 <span>{{ $run->warehouse?->name ?? 'No warehouse' }}</span>
                                 @if($run->warehouse?->code)
-                                    <span class="text-slate-500">/</span>
+                                    <span class="text-slate-300">/</span>
                                     <span>{{ $run->warehouse->code }}</span>
                                 @endif
-                                <span class="text-slate-500">/</span>
+                                <span class="text-slate-300">/</span>
                             @endif
                             <span>{{ $run->assignedDriver?->name ? 'Rider: ' . $run->assignedDriver->name : 'No rider assigned' }}</span>
-                            <span class="text-slate-500">/</span>
+                            <span class="text-slate-300">/</span>
                             <span>Created by {{ $run->createdBy?->name ?? '—' }}</span>
-                            <span class="text-slate-500">/</span>
+                            <span class="text-slate-300">/</span>
                             <span>Created {{ $run->created_at->format('d M Y, h:i A') }}</span>
                         </div>
 
@@ -797,7 +806,7 @@ $itemStatusColors = [
                                 @if($canDispatch)
                                     <button @@click="confirmDispatch()"
                                         :disabled="actionLoading"
-                                        class="inline-flex h-12 items-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+                                        class="inline-flex h-12 items-center gap-2 rounded-2xl bg-[#D95A11] px-5 text-sm font-black text-white shadow-sm shadow-[#D95A11]/25 transition hover:bg-[#B84C0B] disabled:cursor-not-allowed disabled:opacity-60">
                                         <svg x-show="actionLoading" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -814,14 +823,15 @@ $itemStatusColors = [
                 </div>
                 </div>
 
+                {{-- Borderless, beige-tinted counters: the number carries the brand colour, the label stays quiet. --}}
                 <div class="grid grid-cols-2 gap-2 sm:gap-3 lg:ml-auto lg:w-[430px] lg:shrink-0 2xl:w-[480px]">
-                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur sm:p-4">
-                        <p class="text-2xl font-black leading-tight text-white">{{ number_format($totalStops) }} stops</p>
-                        <p class="mt-2 text-sm font-black leading-snug text-slate-400">{{ number_format($deliveredStops) }} delivered / {{ number_format($pendingStops) }} pending</p>
+                    <div class="rounded-2xl bg-[#FAF6F0] p-3 sm:p-4">
+                        <p class="text-2xl font-black leading-tight text-[#D95A11]">{{ number_format($totalStops) }} stops</p>
+                        <p class="mt-2 text-sm font-semibold leading-snug text-slate-500">{{ number_format($deliveredStops) }} delivered / {{ number_format($pendingStops) }} pending</p>
                     </div>
-                    <div class="rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur sm:p-4">
-                        <p class="text-2xl font-black leading-tight text-white">{{ number_format($totalItems) }} packages</p>
-                        <p class="mt-2 text-sm font-black leading-snug text-slate-400">{{ number_format($deliveredItems) }} delivered packages</p>
+                    <div class="rounded-2xl bg-[#FAF6F0] p-3 sm:p-4">
+                        <p class="text-2xl font-black leading-tight text-[#D95A11]">{{ number_format($totalItems) }} packages</p>
+                        <p class="mt-2 text-sm font-semibold leading-snug text-slate-500">{{ number_format($deliveredItems) }} delivered packages</p>
                     </div>
                 </div>
             </div>
@@ -839,10 +849,10 @@ $itemStatusColors = [
                 <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Delivery Timeline</p>
                 <div class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
                     <span class="text-sm font-black text-slate-950">{{ $latestTimelineEvent['label'] }}</span>
-                    <span class="text-slate-300">/</span>
+                    <span class="text-slate-500">/</span>
                     <span class="text-xs font-bold text-slate-500">{{ $latestTimelineEvent['at_label'] }}</span>
                     @if($latestTimelineEvent['actor'] ?? null)
-                        <span class="text-slate-300">/</span>
+                        <span class="text-slate-500">/</span>
                         <span class="truncate text-xs font-bold text-slate-500">by {{ $latestTimelineEvent['actor'] }}</span>
                     @endif
                 </div>
@@ -884,7 +894,7 @@ $itemStatusColors = [
                                     <span>by {{ $event['actor'] }}</span>
                                 @endif
                                 @if(($event['actor'] ?? null) && ($event['detail'] ?? null))
-                                    <span class="text-slate-300">/</span>
+                                    <span class="text-slate-500">/</span>
                                 @endif
                                 @if($event['detail'] ?? null)
                                     <span>{{ $event['detail'] }}</span>
@@ -1003,7 +1013,7 @@ $itemStatusColors = [
                                         <p class="truncate text-sm font-black text-slate-900" x-text="row.item_description || '-'"></p>
                                         <div class="mt-1 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
                                             <span x-text="row.shipment_number || '-'"></span>
-                                            <span class="text-slate-300">/</span>
+                                            <span class="text-slate-500">/</span>
                                             <span class="font-mono" x-text="row.tracking_code || 'No tracking'"></span>
                                         </div>
                                     </td>
@@ -1309,10 +1319,11 @@ $itemStatusColors = [
                         </div>
                     </div>
 
-                    <div class="grid gap-3 px-4 py-4 sm:grid-cols-2 xl:grid-cols-4 sm:px-5">
-                        <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                            <p class="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Planned Location</p>
-                            <p class="mt-1 text-sm font-black text-slate-900">{{ $locationParts ?: '—' }}</p>
+                    {{-- One borderless strip: the four facts about this stop, no nested boxes. --}}
+                    <div class="grid gap-x-6 gap-y-4 px-4 py-5 sm:grid-cols-2 xl:grid-cols-4 sm:px-5">
+                        <div>
+                            <p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400"><svg class="h-3.5 w-3.5 shrink-0 text-[#D95A11]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21s-7-5.686-7-11a7 7 0 1 1 14 0c0 5.314-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5" stroke-width="2"/></svg>Planned Location</p>
+                            <p class="mt-1.5 text-sm font-semibold text-slate-800">{{ $locationParts ?: '—' }}</p>
                             @if($stop->gh_post_address || $stop->landmark)
                                 <p class="mt-1 text-xs font-semibold text-slate-500">{{ collect([$stop->gh_post_address, $stop->landmark])->filter()->implode(' / ') }}</p>
                             @endif
@@ -1323,9 +1334,9 @@ $itemStatusColors = [
                             @endif
                         </div>
 
-                        <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                            <p class="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Rider Captured</p>
-                            <p class="mt-1 text-sm font-black text-slate-900">
+                        <div>
+                            <p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400"><svg class="h-3.5 w-3.5 shrink-0 text-[#D95A11]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Rider Captured</p>
+                            <p class="mt-1.5 text-sm font-semibold text-slate-800">
                                 @if($stop->delivered_at)
                                     {{ $stop->delivered_at->format('d M Y, h:i A') }}
                                 @elseif($stop->arrived_at)
@@ -1344,8 +1355,8 @@ $itemStatusColors = [
                             @endif
                         </div>
 
-                            <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                                <p class="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Proof</p>
+                            <div>
+                                <p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400"><svg class="h-3.5 w-3.5 shrink-0 text-[#D95A11]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Z"/></svg>Proof</p>
                                 @if($proofPhotoUrl)
                                 <a href="#"
                                     @@click.prevent="openProofPhoto({{ \Illuminate\Support\Js::from([
@@ -1362,13 +1373,13 @@ $itemStatusColors = [
                                     View proof photo
                                 </a>
                             @else
-                                <p class="mt-1 text-sm font-black text-slate-900">No proof photo</p>
+                                <p class="mt-1.5 text-sm font-semibold text-slate-800">No proof photo</p>
                             @endif
                         </div>
 
-                        <div class="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                            <p class="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Verification</p>
-                            <p class="mt-1 text-sm font-black text-slate-900">{{ $deliveryMethodLabel }}</p>
+                        <div>
+                            <p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400"><svg class="h-3.5 w-3.5 shrink-0 text-[#D95A11]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 0 1 2 2m4 0a6 6 0 0 1-7.743 5.743L11 17H9v2H7v2H4a1 1 0 0 1-1-1v-2.586a1 1 0 0 1 .293-.707l5.964-5.964A6 6 0 1 1 21 9Z"/></svg>Verification</p>
+                            <p class="mt-1.5 text-sm font-semibold text-slate-800">{{ $deliveryMethodLabel }}</p>
                             <p class="mt-1 text-xs font-semibold text-slate-500">
                                 {{ (int) $stop->verification_attempts }} OTP {{ (int) $stop->verification_attempts === 1 ? 'attempt' : 'attempts' }}
                                 @if($stop->verification_skipped)
@@ -1404,9 +1415,9 @@ $itemStatusColors = [
                     @if($stop->items->isNotEmpty())
                         <div class="px-4 pb-4 sm:px-5">
                             <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Packages ({{ $stop->items->count() }})</p>
-                            <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                            <div class="overflow-x-auto rounded-2xl border border-slate-200/70 bg-white">
                                 <div class="min-w-[900px]">
-                                    <div class="grid grid-cols-12 gap-3 border-b border-slate-100 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                                    <div class="grid grid-cols-12 gap-3 border-b border-slate-200/70 bg-[#FAF6F0] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
                                     <span class="col-span-4">Package</span>
                                     <span class="col-span-2">Tracking</span>
                                     <span class="col-span-1">Qty</span>
@@ -1506,7 +1517,7 @@ $itemStatusColors = [
                                                 <button
                                                     type="button"
                                                     @@click.prevent="openDelayModal({{ \Illuminate\Support\Js::from($delayNoticePayload) }})"
-                                                    class="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-black text-amber-700 transition hover:bg-amber-100">
+                                                    class="inline-flex items-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-black text-amber-700 transition hover:bg-amber-100">
                                                     Delay
                                                 </button>
                                             @endif
@@ -1520,7 +1531,7 @@ $itemStatusColors = [
                                                         stopNumber: @js($index + 1),
                                                         photos: @js($itemPhotos->pluck('url')->values()->toArray())
                                                     })"
-                                                    class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-700 transition hover:bg-slate-50">
+                                                    class="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700 transition hover:bg-slate-50">
                                                     View photos
                                                 </button>
                                             @else
@@ -1594,17 +1605,17 @@ $itemStatusColors = [
                                 ->value('code');
                         @endphp
                         @if($otpCode)
-                        <div class="mx-4 mb-4 overflow-hidden rounded-2xl border-2 border-orange-300 bg-orange-50 sm:mx-5">
-                            <div class="flex items-center justify-between gap-3 border-b border-orange-200 bg-orange-100 px-4 py-2">
-                                <span class="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-orange-800">
+                        <div class="mx-4 mb-4 overflow-hidden rounded-2xl border border-[#D95A11]/20 bg-[#FAF6F0] sm:mx-5">
+                            <div class="flex items-center justify-between gap-3 border-b border-[#D95A11]/15 px-4 py-2.5">
+                                <span class="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#B84C0B]">
                                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                                     Delivery PIN
                                 </span>
-                                <span class="text-[10px] font-semibold text-orange-700">Sent {{ $stop->verification_code_sent_at->diffForHumans() }}</span>
+                                <span class="text-[10px] font-semibold text-slate-500">Sent {{ $stop->verification_code_sent_at->diffForHumans() }}</span>
                             </div>
                             <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-                                <span class="font-mono text-3xl font-black leading-none tracking-[0.3em] text-orange-900 tabular-nums">{{ $otpCode }}</span>
-                                <span class="text-[11px] font-semibold text-orange-700">
+                                <span class="font-mono text-3xl font-black leading-none tracking-[0.3em] text-[#D95A11] tabular-nums">{{ $otpCode }}</span>
+                                <span class="text-[11px] font-semibold text-slate-600">
                                     {{ ($stop->recipient_name ?: 'The recipient') . ' reads this to the rider to close the stop.' }}
                                 </span>
                             </div>
@@ -1617,7 +1628,7 @@ $itemStatusColors = [
                     <div class="flex justify-end px-4 pb-4 sm:px-5">
                         <button @@click="resendCode({{ $stop->id }})"
                             :disabled="actionLoading"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            class="inline-flex items-center gap-1.5 rounded-xl border border-[#D95A11]/30 bg-[#D95A11]/5 px-3 py-2 text-xs font-black text-[#B84C0B] transition hover:bg-[#D95A11]/10 disabled:cursor-not-allowed disabled:opacity-50">
                             <svg x-show="actionLoading" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>

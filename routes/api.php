@@ -258,6 +258,14 @@ Route::prefix('v1/driver')->group(function () {
 
         Route::post('transporter/location', [TransporterLocationController::class, 'updateLocation']);
 
+        /*
+         * A delivery-run rider reports to a path named for their own role rather
+         * than the transporter one. Same handler and same body: the controller
+         * already records the fix against whoever is acting, and delivery-run
+         * riders were the ones the dashboard showed as "position unknown".
+         */
+        Route::post('location', [TransporterLocationController::class, 'updateLocation']);
+
         Route::get('rider-teams', [DriverRiderTeamController::class, 'index']);
         Route::get('rider-teams/{team}', [DriverRiderTeamController::class, 'show']);
         Route::post('rider-teams/{team}/members/lookup', [DriverRiderTeamController::class, 'lookupMember']);
