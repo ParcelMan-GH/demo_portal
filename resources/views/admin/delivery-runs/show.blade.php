@@ -1576,7 +1576,14 @@ $itemStatusColors = [
                         </div>
                     @endif
 
-                    {{-- OTP Code Display — hide for bus handoff --}}
+                    {{--
+                        Delivery PIN — the 4-digit code the recipient reads out to
+                        the rider. The hub is often the one relaying it over the
+                        phone when the SMS does not land, so it is shown in full,
+                        at size, and not folded into the verification status strip.
+                        Hidden for bus handoffs (no OTP is issued) and once the
+                        stop is resolved.
+                    --}}
                     @if(($stop->delivery_method ?? 'direct') !== 'bus_handoff' && $stop->verification_code_sent_at && $stop->status !== 'delivered')
                         @php
                             $otpCode = \App\Models\OtpCode::where('phone', (string) $stop->recipient_phone)
@@ -1587,13 +1594,20 @@ $itemStatusColors = [
                                 ->value('code');
                         @endphp
                         @if($otpCode)
-                        <div class="mx-4 mb-4 flex items-center gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 sm:mx-5">
-                            <svg class="w-4 h-4 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
-                            <div>
-                                <span class="text-[10px] font-semibold text-indigo-500 uppercase tracking-wider">OTP Code</span>
-                                <span class="ml-2 text-lg font-black text-indigo-700 tracking-[0.3em]">{{ $otpCode }}</span>
+                        <div class="mx-4 mb-4 overflow-hidden rounded-2xl border-2 border-orange-300 bg-orange-50 sm:mx-5">
+                            <div class="flex items-center justify-between gap-3 border-b border-orange-200 bg-orange-100 px-4 py-2">
+                                <span class="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-orange-800">
+                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                                    Delivery PIN
+                                </span>
+                                <span class="text-[10px] font-semibold text-orange-700">Sent {{ $stop->verification_code_sent_at->diffForHumans() }}</span>
                             </div>
-                            <span class="text-[10px] text-indigo-400 ml-auto">Sent {{ $stop->verification_code_sent_at->diffForHumans() }}</span>
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
+                                <span class="font-mono text-3xl font-black leading-none tracking-[0.3em] text-orange-900 tabular-nums">{{ $otpCode }}</span>
+                                <span class="text-[11px] font-semibold text-orange-700">
+                                    {{ ($stop->recipient_name ?: 'The recipient') . ' reads this to the rider to close the stop.' }}
+                                </span>
+                            </div>
                         </div>
                         @endif
                     @endif
