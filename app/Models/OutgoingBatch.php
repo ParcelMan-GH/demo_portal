@@ -118,9 +118,20 @@ class OutgoingBatch extends Model
      * never name different destinations.
      *
      * Prefers a hub in the same district, then any active hub in the region, and
-     * returns null when the region has no hub — which is the honest answer, not a
-     * guess. A caller must treat null as "no inter-hub transfer recorded" rather
-     * than falling back to something plausible.
+     * then — when the region has no hub of its own — the network's default
+     * routing hub.
+     *
+     * That last step deliberately reverses the previous rule, which returned null
+     * and called it the honest answer. It was honest, and it left 14 of Ghana's 16
+     * regions unable to dispatch anything: only Greater Accra and Ashanti have
+     * warehouses, so a batch for anywhere else had no destination at all and the
+     * transport manifest had nothing to name. A batch that reaches the HQ can be
+     * sorted onward; a batch that reaches nowhere cannot move.
+     *
+     * The distinction is still real rather than pretended: the region's own hub
+     * always wins, and the fallback is only reached when there is none. A caller
+     * that needs to know which happened can compare the resolved warehouse's
+     * region against the batch's.
      */
     public static function resolveDestinationWarehouseId(?int $regionId, ?int $districtId): ?int
     {
@@ -147,7 +158,30 @@ class OutgoingBatch extends Model
             }
         }
 
-        return ($first = (clone $base)->orderBy('id')->first()) ? (int) $first->id : null;
+        $inRegion = (clone $base)->orderBy('id')->first();
+
+        if ($inRegion) {
+            return (int) $inRegion->id;
+        }
+
+        /*
+         * No hub in this region: fall back to the default routing hub — the HQ
+         * where there is one, otherwise the lowest-numbered active warehouse.
+         *
+         * Chosen by `is_hq` rather than by id so the choice survives a reseed; on
+         * this data it resolves to Accra Main (id 1), the network's root hub.
+         */
+        $default = Warehouse::query()
+            ->where('is_active', true)
+            ->when(
+                Schema::hasColumn('warehouses', 'type'),
+                fn ($query) => $query->whereIn('type', ['destination', 'both'])
+            )
+            ->orderByDesc('is_hq')
+            ->orderBy('id')
+            ->first();
+
+        return $default ? (int) $default->id : null;
     }
 
     /**

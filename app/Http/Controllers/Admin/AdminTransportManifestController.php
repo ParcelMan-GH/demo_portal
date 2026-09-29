@@ -223,8 +223,9 @@ class AdminTransportManifestController extends Controller
             $chosen = $validated['destination_warehouse_id'] ?? null;
 
             // An explicit choice wins; otherwise work it out from where the batch
-            // is going. Null when that region has no hub, which is the honest
-            // answer rather than pointing at a plausible-looking wrong hub.
+            // is going. When that region has no hub of its own this now resolves
+            // to the default routing hub rather than null, because a batch with no
+            // destination cannot be dispatched at all.
             $attributes['destination_warehouse_id'] = filled($chosen)
                 ? (int) $chosen
                 : OutgoingBatch::resolveDestinationWarehouseId(
