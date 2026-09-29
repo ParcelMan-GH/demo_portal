@@ -71,18 +71,37 @@ class LabelImagePreprocessor
             }
 
             /*
-             * Neighbourhood of roughly an eighth of the image, capped so a huge
-             * photo does not wash out individual characters. The offset is the
-             * constant taken off the local mean before comparing — 15% of the
-             * quantum range is the usual starting point and keeps faint strokes
-             * that a heavier offset would drop.
+             * The neighbourhood has to stay small relative to the strokes.
+             *
+             * A first attempt used an eighth of the image — about 112px on a
+             * 900px label — and the local mean over a window that wide is
+             * dominated by background even directly on top of a character. Every
+             * pixel then fell below the mean and a clean label came back solid
+             * black. Measured, not guessed: see the binarisation check in the
+             * verification run.
+             *
+             * Scaled to the short edge and clamped, so a printed character is a
+             * meaningful fraction of the window at any resolution.
              */
-            $radiusX = max(3, (int) round($width / 8));
-            $radiusY = max(3, (int) round($height / 8));
-            $quantumRange = $image->getQuantumRange();
-            $offset = (int) round(0.15 * ($quantumRange['quantumRangeLong'] ?? 65535));
+            $neighbourhood = max(15, min(75, (int) round(min($width, $height) / 50)));
 
-            $image->adaptiveThresholdImage($radiusX, $radiusY, $offset);
+            $quantumRange = $image->getQuantumRange();
+            $quantum = $quantumRange['quantumRangeLong'] ?? 65535;
+            // A modest constant, ~8% of the range: enough to ignore paper grain,
+            // small enough not to erase faint strokes.
+            $offset = (int) round(0.08 * $quantum);
+
+            $image->adaptiveThresholdImage($neighbourhood, $neighbourhood, $offset);
+
+            /*
+             * Polarity. Which way round ImageMagick returns this depends on how
+             * it was built, and recognisers are trained on dark text over a light
+             * background, so flip it when the result came out mostly dark.
+             */
+            if ($this->isMostlyDark($image, $quantum)) {
+                $image->negateImage(false);
+            }
+
             $image->setImageFormat('png');
 
             // An explicit .png name: the path is handed to the recogniser, and
@@ -107,6 +126,26 @@ class LabelImagePreprocessor
 
             return $absolutePath;
         }
+    }
+
+    /** True when more than half the pixels sit below mid-range. */
+    private function isMostlyDark(Imagick $image, int $quantum): bool
+    {
+        $dark = 0;
+        $total = 0;
+
+        foreach ($image->getImageHistogram() as $pixel) {
+            $count = $pixel->getColorCount();
+            $total += $count;
+
+            $colour = $pixel->getColor();
+
+            if ((($colour['r'] + $colour['g'] + $colour['b']) / 3) < ($quantum / 2)) {
+                $dark += $count;
+            }
+        }
+
+        return $total > 0 && $dark > ($total / 2);
     }
 
     /**
