@@ -25,6 +25,8 @@ use App\Listeners\SendDriverAssignmentNotification;
 use App\Listeners\SendDriverTransportNotification;
 use App\Listeners\SendDriverDeliveryNotification;
 use App\Listeners\SendDriverUnassignedNotification;
+use App\Listeners\SendRiderAssignedSms;
+use App\Listeners\SendShipmentStatusSms;
 use App\Listeners\SendCollectionNotifications;
 use App\Listeners\SendCustomerEmailTemplateNotification;
 use App\Listeners\SendVendorShipmentNotification;
@@ -41,6 +43,9 @@ class EventServiceProvider extends ServiceProvider
             SendVendorShipmentNotification::class,
             SendAdminShipmentNotification::class,
             SendCustomerEmailTemplateNotification::class,
+            // Customer texts on picked_up / in_transit / out_for_delivery /
+            // delivered, plus the vendor text on delivered.
+            SendShipmentStatusSms::class,
         ],
 
         
@@ -49,6 +54,8 @@ class EventServiceProvider extends ServiceProvider
         DriverAssignedToPickup::class => [
             SendDriverAssignmentNotification::class,
             SendCustomerEmailTemplateNotification::class,
+            // Texts the vendor the rider's name and number.
+            SendRiderAssignedSms::class,
         ],
         PickupAssignmentStatusChanged::class => [
             SendAdminPickupNotification::class,

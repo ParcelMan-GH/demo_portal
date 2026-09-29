@@ -9,6 +9,7 @@ use App\Models\Driver;
 use App\Models\PickupAssignment;
 use App\Models\PickupItemConfirmation;
 use App\Models\PickupPhoto;
+use App\Models\RiderAssignmentEvent;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
@@ -25,6 +26,14 @@ class PickupAssignmentService
         private RiderAssignmentAuditService $assignmentAudit,
     ) {}
 
+    /**
+     * Assign a rider to a shipment.
+     *
+     * $pickupVehicleTypeId is optional and stays optional on purpose: when it is
+     * null this behaves exactly as it always has — one more rider, no slot — so
+     * every existing caller is untouched. When it is given, the assignment
+     * claims the next free slot of that requested vehicle type.
+     */
     public function assign(
         Shipment $shipment,
         Driver $driver,
@@ -32,6 +41,7 @@ class PickupAssignmentService
         ?string $notes = null,
         ?int $targetWarehouseId = null,
         bool $confirmBusyAssignment = false,
+        ?int $pickupVehicleTypeId = null,
     ): array {
         if (! $shipment->canBeAssigned()) {
             return [
@@ -54,7 +64,7 @@ class PickupAssignmentService
             ];
         }
 
-        return DB::transaction(function () use ($shipment, $driver, $admin, $notes, $targetWarehouseId, $confirmBusyAssignment) {
+        return DB::transaction(function () use ($shipment, $driver, $admin, $notes, $targetWarehouseId, $confirmBusyAssignment, $pickupVehicleTypeId) {
             $lockedShipment = Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
             $lockedDriver = Driver::query()->lockForUpdate()->findOrFail($driver->id);
 
@@ -76,9 +86,41 @@ class PickupAssignmentService
                 return $busy;
             }
 
+            // Claim a slot only when the caller named a vehicle type. The
+            // requested quantity of that type is the ceiling, and the slot number
+            // is one past the highest already used on the shipment (1-based).
+            $slotNumber = null;
+            if ($pickupVehicleTypeId !== null) {
+                $requested = (int) $lockedShipment->pickupVehicleRequests()
+                    ->where('pickup_vehicle_type_id', $pickupVehicleTypeId)
+                    ->sum('quantity');
+
+                if ($requested === 0) {
+                    return ['success' => false, 'message' => 'That vehicle type was not requested for this shipment.'];
+                }
+
+                $alreadyAssigned = PickupAssignment::query()
+                    ->where('shipment_id', $lockedShipment->id)
+                    ->where('pickup_vehicle_type_id', $pickupVehicleTypeId)
+                    ->where('status', '!=', PickupAssignmentStatus::CANCELLED)
+                    ->count();
+
+                if ($alreadyAssigned >= $requested) {
+                    return ['success' => false, 'message' => 'All requested slots for that vehicle type are already assigned.'];
+                }
+
+                $slotNumber = (int) PickupAssignment::query()
+                    ->where('shipment_id', $lockedShipment->id)
+                    ->max('slot_number') + 1;
+            }
+
+            $coverageBefore = $lockedShipment->pickupCoverageStatus();
+
             $assignment = PickupAssignment::query()->create([
                 'shipment_id' => $lockedShipment->id,
                 'driver_id' => $lockedDriver->id,
+                'pickup_vehicle_type_id' => $pickupVehicleTypeId,
+                'slot_number' => $slotNumber,
                 'target_warehouse_id' => $targetWarehouseId,
                 'status' => PickupAssignmentStatus::ASSIGNED,
                 'assigned_by' => $admin?->id,
@@ -88,6 +130,23 @@ class PickupAssignmentService
 
             $lockedShipment->update(['status' => ShipmentStatus::PICKUP_ASSIGNED]);
             $this->assignmentAudit->record('pickup', $assignment->id, 'assigned', null, $lockedDriver->id, $admin);
+
+            // Coverage is derived, so recompute it from the assignments now that
+            // this one exists, and record the move on the same audit trail.
+            $lockedShipment->load('pickupAssignments');
+            $coverageAfter = $lockedShipment->pickupCoverageStatus();
+            if ($coverageBefore !== $coverageAfter) {
+                $this->assignmentAudit->record(
+                    'pickup',
+                    $assignment->id,
+                    RiderAssignmentEvent::EVENT_COVERAGE_CHANGED,
+                    null,
+                    $lockedDriver->id,
+                    $admin,
+                    "Pickup coverage {$coverageBefore->value} → {$coverageAfter->value}",
+                );
+            }
+
             $this->workloads->syncStatus($lockedDriver);
 
             event(new \App\Events\DriverAssignedToPickup($assignment, $lockedDriver));
@@ -669,6 +728,12 @@ class PickupAssignmentService
             }
 
             $driver = $assignment->driver;
+            $assignment->loadMissing('shipment');
+
+            // Coverage is derived from the live assignments, so snapshot it
+            // before and after this cancellation and log any move.
+            $coverageBefore = $assignment->shipment?->pickupCoverageStatus();
+
             $assignment->update([
                 'status' => PickupAssignmentStatus::CANCELLED,
                 'cancelled_at' => now(),
@@ -688,6 +753,22 @@ class PickupAssignmentService
             }
 
             $this->assignmentAudit->record('pickup', $assignment->id, 'unassigned', $driver?->id, null, $actor, $reason);
+
+            if ($assignment->shipment) {
+                $assignment->shipment->load('pickupAssignments');
+                $coverageAfter = $assignment->shipment->pickupCoverageStatus();
+                if ($coverageBefore !== $coverageAfter) {
+                    $this->assignmentAudit->record(
+                        'pickup',
+                        $assignment->id,
+                        RiderAssignmentEvent::EVENT_COVERAGE_CHANGED,
+                        $driver?->id,
+                        null,
+                        $actor,
+                        'Pickup coverage '.($coverageBefore?->value ?? 'unknown').' → '.$coverageAfter->value,
+                    );
+                }
+            }
 
             if ($driver) {
                 event(new \App\Events\DriverUnassignedFromPickup($assignment, $driver, $reason));

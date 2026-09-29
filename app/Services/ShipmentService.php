@@ -49,6 +49,7 @@ class ShipmentService
             'pickupAssignment.targetWarehouse',
             'pickupAssignment.receivedWarehouse',
             'pickupVehicleRequests.vehicleType',
+            'pickupAssignments',
             'charges',
         ];
 
@@ -207,6 +208,7 @@ class ShipmentService
             'pickupAssignment.photos',
             'pickupAssignment.warehouseReceipt.items',
             'pickupVehicleRequests.vehicleType',
+            'pickupAssignments',
             'charges',
         ]);
 
@@ -649,6 +651,16 @@ class ShipmentService
             'requested_vehicles' => $this->transformPickupVehicleRequests($shipment),
             'pickup_vehicles' => $this->transformPickupVehicleRequests($shipment),
             'pickup_vehicle_summary' => $this->pickupVehicleSummary($shipment),
+            /*
+             * Derived pickup coverage, additive only. Nothing above is renamed
+             * or removed: `requested_vehicles` / `pickup_vehicles` /
+             * `pickup_vehicle_summary` keep their existing shape for the
+             * installed mobile builds.
+             */
+            'pickup_coverage_status' => $shipment->pickupCoverageStatus()->value,
+            'pickup_required_slots' => $shipment->pickupRequiredSlotCount(),
+            'pickup_assigned_slots' => $shipment->pickupAssignedSlotCount(),
+            'pickup_slot_breakdown' => $shipment->pickupSlotBreakdown(),
             'rejected_at' => $shipment->rejected_at?->toIso8601String(),
             'rejection_reason' => $shipment->rejection_reason,
             'rejected_by_admin_id' => $shipment->rejected_by_admin_id,

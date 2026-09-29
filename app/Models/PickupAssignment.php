@@ -16,6 +16,9 @@ class PickupAssignment extends Model
     protected $fillable = [
         'shipment_id',
         'driver_id',
+        // Null on every assignment that predates multi-slot requests.
+        'pickup_vehicle_type_id',
+        'slot_number',
         'target_warehouse_id',
         'status',
         'assigned_by',
@@ -39,6 +42,8 @@ class PickupAssignment extends Model
 
     protected $casts = [
         'status' => PickupAssignmentStatus::class,
+        'pickup_vehicle_type_id' => 'integer',
+        'slot_number' => 'integer',
         'assigned_at' => 'datetime',
         'en_route_at' => 'datetime',
         'arrived_at' => 'datetime',
@@ -70,6 +75,15 @@ class PickupAssignment extends Model
     public function targetWarehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class, 'target_warehouse_id');
+    }
+
+    /**
+     * The requested vehicle type this assignment covers. Null for the historical
+     * unslotted assignments.
+     */
+    public function pickupVehicleType(): BelongsTo
+    {
+        return $this->belongsTo(PickupVehicleType::class, 'pickup_vehicle_type_id');
     }
 
     public function receivedWarehouse(): BelongsTo

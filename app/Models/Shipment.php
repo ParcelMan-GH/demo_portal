@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\FulfillmentType;
+use App\Enums\PickupAssignmentStatus;
+use App\Enums\PickupCoverageStatus;
 use App\Enums\ShipmentDestinationMode;
 use App\Enums\ShipmentSource;
 use App\Enums\ShipmentStatus;
@@ -274,6 +276,133 @@ class Shipment extends Model
     public function pickupVehicleRequests(): HasMany
     {
         return $this->hasMany(ShipmentPickupVehicleRequest::class);
+    }
+
+    /**
+     * How many pickup slots this shipment asked for — the sum of the quantities
+     * on its per-vehicle requests. Zero means no vehicle type was ever requested,
+     * which is true for most historical rows.
+     *
+     * Reads the loaded relation when it is there so a list transform does not
+     * fire one query per shipment; otherwise it queries, the way
+     * transformPickupVehicleRequests already falls back.
+     */
+    public function pickupRequiredSlotCount(): int
+    {
+        $requests = $this->relationLoaded('pickupVehicleRequests')
+            ? $this->pickupVehicleRequests
+            : $this->pickupVehicleRequests()->get();
+
+        return (int) $requests->sum('quantity');
+    }
+
+    /**
+     * How many pickup slots are currently filled: every assignment that has not
+     * been cancelled. A cancelled assignment releases its slot back.
+     */
+    public function pickupAssignedSlotCount(): int
+    {
+        $assignments = $this->relationLoaded('pickupAssignments')
+            ? $this->pickupAssignments
+            : $this->pickupAssignments()->get();
+
+        return $assignments
+            ->filter(fn (PickupAssignment $assignment) => $assignment->status !== PickupAssignmentStatus::CANCELLED)
+            ->count();
+    }
+
+    /**
+     * How well the requested slots are covered.
+     *
+     * Derived on every read rather than stored: a stored copy of "3 of 3 filled"
+     * would drift the moment an assignment is cancelled or added, and the whole
+     * point of the number is to summarise those rows.
+     *
+     * The required === 0 && assigned > 0 case resolves to FULLY_ASSIGNED on
+     * purpose. Shipments that never requested a vehicle (all the historical
+     * data) are still allowed exactly one rider through the legacy flow, and
+     * calling that PARTIALLY_ASSIGNED would make every one of them look somehow
+     * incomplete. With no request to measure against, a live rider is complete.
+     */
+    public function pickupCoverageStatus(): PickupCoverageStatus
+    {
+        $required = $this->pickupRequiredSlotCount();
+        $assigned = $this->pickupAssignedSlotCount();
+
+        if ($assigned === 0) {
+            return PickupCoverageStatus::UNASSIGNED;
+        }
+
+        if ($required === 0) {
+            return PickupCoverageStatus::FULLY_ASSIGNED;
+        }
+
+        return $assigned >= $required
+            ? PickupCoverageStatus::FULLY_ASSIGNED
+            : PickupCoverageStatus::PARTIALLY_ASSIGNED;
+    }
+
+    /**
+     * Per requested vehicle TYPE, how many slots were asked for and how many are
+     * already covered, in the order the requests were created. Lets the admin UI
+     * render "2x Motorbike, 1x Aboboyaa" and see how many of each remain.
+     *
+     * Assignments are matched by pickup_vehicle_type_id. Historical unslotted
+     * assignments carry no type, so they count towards the shipment total in
+     * pickupAssignedSlotCount() but not against any one type here.
+     */
+    public function pickupSlotBreakdown(): array
+    {
+        $requests = $this->relationLoaded('pickupVehicleRequests')
+            ? $this->pickupVehicleRequests->sortBy('id')->values()
+            : $this->pickupVehicleRequests()->orderBy('id')->get();
+
+        if ($requests->isEmpty()) {
+            return [];
+        }
+
+        // Avoid an N+1 on vehicleType when the relation came in without it.
+        if (! $requests->first()->relationLoaded('vehicleType')) {
+            $requests->load('vehicleType');
+        }
+
+        $assignments = $this->relationLoaded('pickupAssignments')
+            ? $this->pickupAssignments
+            : $this->pickupAssignments()->get();
+
+        $assignedByType = $assignments
+            ->filter(fn (PickupAssignment $assignment) => $assignment->status !== PickupAssignmentStatus::CANCELLED
+                && ! is_null($assignment->pickup_vehicle_type_id))
+            ->countBy('pickup_vehicle_type_id');
+
+        $breakdown = [];
+
+        foreach ($requests as $request) {
+            $typeId = $request->pickup_vehicle_type_id;
+            // Group repeats of the same type; fall back to the snapshot name when
+            // the type row has been deleted (the FK is nullOnDelete).
+            $key = $typeId
+                ? "type:{$typeId}"
+                : 'snapshot:'.($request->vehicle_name_snapshot ?? 'unknown');
+
+            if (! isset($breakdown[$key])) {
+                $breakdown[$key] = [
+                    'type' => $request->vehicleType?->slug,
+                    'vehicle_type_id' => $typeId,
+                    'name' => $request->vehicleType?->name ?? $request->vehicle_name_snapshot,
+                    'required' => 0,
+                    'assigned' => 0,
+                ];
+            }
+
+            $breakdown[$key]['required'] += (int) $request->quantity;
+
+            if ($typeId) {
+                $breakdown[$key]['assigned'] = (int) ($assignedByType[$typeId] ?? 0);
+            }
+        }
+
+        return array_values($breakdown);
     }
 
     public function collection(): HasOne

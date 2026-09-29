@@ -41,7 +41,18 @@ class PickupAssignmentController extends Controller
     {
         $this->authorizePermission('shipments.view');
 
-        $query = PickupAssignment::with(['shipment.vendor', 'driver', 'targetWarehouse', 'assignedBy']);
+        $query = PickupAssignment::with([
+            'shipment.vendor',
+            // Coverage is per shipment, and one shipment can now carry several
+            // assignment rows, so both the requested vehicles and the sibling
+            // assignments come along to keep the derived numbers off an N+1.
+            'shipment.pickupVehicleRequests.vehicleType',
+            'shipment.pickupAssignments',
+            'driver',
+            'targetWarehouse',
+            'assignedBy',
+            'pickupVehicleType',
+        ]);
 
         // Search
         if ($search = $request->get('search')) {
@@ -81,8 +92,28 @@ class PickupAssignmentController extends Controller
         $perPage = min($request->get('per_page', 50), 100);
         $assignments = $query->paginate($perPage);
 
+        // Derived coverage is computed once per shipment and reused for every
+        // row of that shipment, so a shipment with several assignments does not
+        // recompute (or re-query) the same numbers.
+        $coverageByShipment = [];
+
         return response()->json([
-            'data' => $assignments->map(function (PickupAssignment $a) {
+            'data' => $assignments->map(function (PickupAssignment $a) use (&$coverageByShipment) {
+                $coverage = [];
+                if ($a->shipment) {
+                    if (! isset($coverageByShipment[$a->shipment->id])) {
+                        $status = $a->shipment->pickupCoverageStatus();
+                        $coverageByShipment[$a->shipment->id] = [
+                            'coverage_status' => $status->value,
+                            'coverage_label' => $status->label(),
+                            'required_slots' => $a->shipment->pickupRequiredSlotCount(),
+                            'assigned_slots' => $a->shipment->pickupAssignedSlotCount(),
+                            'slot_breakdown' => $a->shipment->pickupSlotBreakdown(),
+                        ];
+                    }
+                    $coverage = $coverageByShipment[$a->shipment->id];
+                }
+
                 return [
                     'id' => $a->id,
                     'shipment_id' => $a->shipment_id,
@@ -102,6 +133,14 @@ class PickupAssignmentController extends Controller
                     'picked_up_at' => $a->picked_up_at?->format('Y-m-d H:i:s'),
                     'completed_at' => $a->completed_at?->format('Y-m-d H:i:s'),
                     'received_at' => $a->received_at?->format('Y-m-d H:i:s'),
+                    // Slot position of this row, plus the shipment's derived
+                    // coverage (see $coverageByShipment above).
+                    'pickup_vehicle_type_id' => $a->pickup_vehicle_type_id,
+                    'vehicle_type_name' => $a->pickupVehicleType?->name,
+                    'slot_label' => $a->slot_number
+                        ? 'Slot '.$a->slot_number.' - '.($a->pickupVehicleType?->name ?? 'Vehicle')
+                        : null,
+                    ...$coverage,
                 ];
             }),
             'meta' => [
@@ -165,6 +204,9 @@ class PickupAssignmentController extends Controller
             'target_warehouse_id' => ['required', 'exists:warehouses,id'],
             'notes' => ['nullable', 'string'],
             'confirm_busy_assignment' => ['sometimes', 'boolean'],
+            // Optional: name the requested vehicle type to claim a slot for it.
+            // Omitted, the assignment is created unslotted exactly as before.
+            'pickup_vehicle_type_id' => ['nullable', 'integer', 'exists:pickup_vehicle_types,id'],
         ]);
 
         // Validate shipment readiness
@@ -209,6 +251,7 @@ class PickupAssignmentController extends Controller
             $validated['notes'] ?? null,
             (int) $validated['target_warehouse_id'],
             (bool) ($validated['confirm_busy_assignment'] ?? false),
+            isset($validated['pickup_vehicle_type_id']) ? (int) $validated['pickup_vehicle_type_id'] : null,
         );
 
         return response()->json($result, $this->assignmentResponseStatus($result));
