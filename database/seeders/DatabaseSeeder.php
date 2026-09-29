@@ -30,6 +30,13 @@ class DatabaseSeeder extends Seeder
             DeliveryDelayReasonSeeder::class,
             DeliveryDelaySettingsSeeder::class,
             EmailTemplateSeeder::class,
+            // Referenced by the agent commission ledger: the payout an agent earns
+            // is resolved from these bands, so without them every payout computes
+            // to zero. It was written but never registered here — which is why the
+            // production table was empty and agent earnings read as GH₵ 0.00.
+            // The same rows are also applied by
+            // 2026_09_30_000004_seed_commission_tiers for the deploy path.
+            CommissionTierSeeder::class,
         ]);
 
         // IncomingTransportManifestSeeder is fixture/demo data and is intentionally
