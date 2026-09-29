@@ -128,39 +128,50 @@
                 @if(is_null($onTimeChange))
                     {{-- No deliveries last month: there is no honest comparison. --}}
                     <span class="text-slate-400 font-medium" title="No deliveries were completed last month to compare against">—</span>
-                @else
+                 @else
                     <span class="{{ $onTimeChange >= 0 ? 'text-emerald-500' : 'text-rose-500' }} font-medium">
                         {{ $onTimeChange > 0 ? '+' : '' }}{{ $onTimeChange }}%
                     </span>
                 @endif
             </div>
+        </div>
+    </div>
 
     {{-- ═══ MAIN CONTENT GRID ═══ --}}
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
         {{-- Left: Live Tracking Map --}}
         <div class="xl:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-            <div class="px-6 py-4 flex items-center justify-between border-b border-slate-100 z-10">
-                <div class="flex items-baseline gap-3">
-                    <h2 class="text-sm font-medium text-slate-700">Live Tracking</h2>
-                    <span class="text-xs text-slate-400 font-medium"
+            <div class="px-6 py-4 flex items-center justify-between gap-4 border-b border-slate-100">
+                <div class="flex items-baseline gap-3 min-w-0">
+                    <h2 class="text-sm font-medium text-slate-700 flex-shrink-0">Live Tracking</h2>
+                    <span class="text-xs text-slate-400 font-medium truncate"
                           x-text="riders.length === 0
-                              ? ''
-                              : riders.length + (riders.length === 1 ? ' rider on the road' : ' riders on the road')"></span>
+                              ? 'Nobody is out right now'
+                              : riders.length + (riders.length === 1 ? ' rider on the road' : ' riders on the road')
+                                + (lastUpdated ? ' · updated ' + lastUpdated : '')"></span>
                 </div>
-                <span class="text-xs text-slate-400 font-medium" x-show="riders.length" x-text="lastUpdated ? 'Updated ' + lastUpdated : ''"></span>
-                <div class="flex items-center gap-3">
-                    <div class="relative">
-                        <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <input type="text" placeholder="Search" class="pl-9 pr-4 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 w-48 transition-all">
-                    </div>
+                <div class="relative flex-shrink-0">
+                    <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input type="text" x-model="search" placeholder="Search riders" class="pl-9 pr-4 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 w-40 transition-all">
                 </div>
             </div>
             
+            {{--
+                The panel is a map with a column beside it, not layers on top of it.
+
+                The riders list and the selected rider's detail both used to float
+                over the map, along with the empty state — three overlays stacked
+                on one canvas, which left a strip of map between two cards and
+                read as clutter. The list and the detail share one column now, and
+                the map keeps the rest.
+            --}}
+            <div class="flex-1 flex flex-col lg:flex-row" style="height: 560px;">
+
             {{-- Map Area --}}
-            <div class="relative flex-1 min-h-[500px] bg-slate-100 rounded-b-2xl overflow-hidden z-0" id="map-container" style="height: 500px;" wire:ignore>
-               
-               {{-- Empty state: no active deliveries right now --}}
+            <div class="relative flex-1 bg-slate-100 overflow-hidden" id="map-container" wire:ignore>
+
+               {{-- Empty state: nobody is out --}}
                <div x-show="riders.length === 0"
                     class="absolute inset-0 flex flex-col items-center justify-center text-center bg-slate-50 z-[500]">
                    <div class="w-14 h-14 rounded-full bg-slate-200 flex items-center justify-center mb-3">
@@ -169,51 +180,64 @@
                     <p class="text-sm font-medium text-slate-700">No riders on the road</p>
                     <p class="text-xs text-slate-400 mt-1">Delivery riders and transporters carrying batches appear here as soon as they're out.</p>
                 </div>
+            </div>
 
-                {{--
-                    Everyone who is out, whether or not we can place them.
 
-                    Riders used to be dropped from this panel entirely when they had
-                    no coordinates, which meant "on a run but the phone hasn't
-                    reported" looked exactly like "nobody is working". The list
-                    names them either way and says which it is.
-                --}}
-                <div x-show="riders.length > 0" x-cloak
-                     class="absolute bottom-4 left-4 w-72 max-h-[340px] overflow-y-auto bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200 z-[900]">
-                    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md">
+            {{--
+                Everyone who is out, and the detail of whoever is picked.
+
+                They share one column: the list until a rider is chosen, that
+                rider's detail after. Riders with no fix are listed as position
+                unknown rather than dropped — "on a run, no fix yet" is not the
+                same thing as "nobody is working".
+            --}}
+            <aside class="w-full lg:w-80 flex-shrink-0 border-t lg:border-t-0 lg:border-l border-slate-100 bg-white flex flex-col min-h-0">
+
+                <div x-show="!selectedRider" class="flex flex-col flex-1 min-h-0">
+                    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
                         <span class="text-xs font-semibold text-slate-600">On the road</span>
                         <span class="text-[11px] text-slate-400" x-text="`${riders.filter(r => r.has_position).length} located`"></span>
                     </div>
-                    <template x-for="rider in riders" :key="rider.id">
-                        <button type="button" @click="selectRider(rider.id)"
-                                class="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
-                            <img :src="rider.avatar" alt="" class="w-8 h-8 rounded-full object-cover flex-shrink-0">
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm font-semibold text-slate-800 truncate" x-text="rider.full_name"></p>
-                                <p class="text-[11px] text-slate-500 truncate" x-text="rider.reference + (rider.destination ? ' → ' + rider.destination : '')"></p>
-                                <p class="text-[11px] mt-0.5"
-                                   :class="rider.has_position ? 'text-emerald-600' : 'text-slate-400'"
-                                   x-text="positionLabel(rider)"></p>
-                            </div>
-                            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex-shrink-0"
-                                  :class="rider.kind === 'transport' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'"
-                                  x-text="rider.kind === 'transport' ? 'Transport' : 'Delivery'"></span>
-                        </button>
-                    </template>
+
+                    <div class="flex-1 overflow-y-auto min-h-0">
+                        <template x-for="rider in visibleRiders" :key="rider.id">
+                            <button type="button" @click="selectRider(rider.id)"
+                                    class="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
+                                <img :src="rider.avatar" alt="" class="w-8 h-8 rounded-full object-cover flex-shrink-0">
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-semibold text-slate-800 truncate" x-text="rider.full_name"></p>
+                                    <p class="text-[11px] text-slate-500 truncate" x-text="rider.reference + (rider.destination ? ' → ' + rider.destination : '')"></p>
+                                    <p class="text-[11px] mt-0.5"
+                                       :class="rider.has_position ? 'text-emerald-600' : 'text-slate-400'"
+                                       x-text="positionLabel(rider)"></p>
+                                </div>
+                                <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex-shrink-0"
+                                      :class="rider.kind === 'transport' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'"
+                                      x-text="rider.kind === 'transport' ? 'Transport' : 'Delivery'"></span>
+                            </button>
+                        </template>
+
+                        <p x-show="visibleRiders.length === 0" class="px-4 py-8 text-center text-xs text-slate-400"
+                           x-text="riders.length === 0 ? 'Nobody is out right now.' : 'No rider matches that search.'"></p>
+                    </div>
                 </div>
 
-               {{-- EXACT FIXED SIDE PANEL FROM YOUR SCREENSHOT --}}
+               {{-- Whoever is picked --}}
                <div x-show="selectedRider" style="display: none;"
                     x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0 translate-x-4"
                     x-transition:enter-end="opacity-100 translate-x-0"
-                    class="absolute top-4 right-4 bottom-4 w-80 bg-slate-50/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 p-6 z-[1000] overflow-y-auto">
-                    
-                    <div class="absolute right-4 top-4 text-slate-400 cursor-pointer hover:text-slate-600">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
-                    </div>
+                    class="flex-1 min-h-0 overflow-y-auto p-6">
 
-                    <!-- Carousel Arrows & Avatar -->
+                   <div class="flex justify-end">
+                       <button type="button" @click="selectedRider = null"
+                               class="text-slate-400 hover:text-slate-700 transition-colors"
+                               title="Back to everyone on the road">
+                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                       </button>
+                   </div>
+
+                   <!-- Carousel Arrows & Avatar -->
                     <div class="flex items-center justify-between mb-4 mt-2">
                         <button class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-slate-400 hover:text-slate-600 border border-slate-100">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -274,7 +298,8 @@
                     </div>
 
                </div>
-               {{-- END FIXED SIDE PANEL --}}
+               {{-- END rider detail --}}
+            </aside>
             </div>
         </div>
 
@@ -282,10 +307,12 @@
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
             <div class="px-6 py-4 flex items-center justify-between border-b border-slate-100">
                 <h2 class="text-sm font-medium text-slate-700">Activities Feed</h2>
-                <button class="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
-                    Today
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                </button>
+                {{--
+                    Was a "Today" dropdown button with a chevron that had no
+                    handler behind it: a control that promised a filter and did
+                    nothing. The feed is already the newest events, so it says so.
+                --}}
+                <span class="text-xs text-slate-400 font-medium">Newest first</span>
             </div>
             
             {{--
@@ -347,8 +374,26 @@
         Alpine.data('dashboardController', () => ({
             selectedRider: null,
             riders: @json($activeRiders),
+            search: "",
             markers: {},
             map: null,
+
+            /**
+             * The list, narrowed by the search box.
+             *
+             * Filtering happens here rather than on the map: an admin looking for
+             * one rider should not lose the others off the map, and pins follow
+             * `riders`, not the filtered view.
+             */
+            get visibleRiders() {
+                const term = String(this.search || "").trim().toLowerCase();
+                if (!term) return this.riders;
+
+                return this.riders.filter((rider) =>
+                    [rider.full_name, rider.reference, rider.destination, rider.next_stop]
+                        .some((field) => String(field || "").toLowerCase().includes(term)),
+                );
+            },
             lastUpdated: '',
             pollTimer: null,
 
@@ -368,6 +413,12 @@
                 // Recalculate layout after the container has its final size
                 // (prevents the blank grey map caused by a 0-height container)
                 setTimeout(() => this.map.invalidateSize(), 150);
+
+                // The riders column stacks under the map on narrow screens, which
+                // changes the canvas size. Without this the map keeps drawing for
+                // the old size — the "map showing half of Africa" symptom — until
+                // the page is reloaded.
+                window.addEventListener('resize', () => this.map && this.map.invalidateSize());
 
                 // Same code path as every poll, so a rider who reports in later
                 // appears without the admin reloading the page.
