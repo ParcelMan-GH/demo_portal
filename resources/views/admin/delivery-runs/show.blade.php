@@ -1522,10 +1522,21 @@ $itemStatusColors = [
                                             <p class="truncate text-xs font-semibold text-slate-700">{{ $item->delivered_quantity ?? 0 }}/{{ $item->expected_quantity }}</p>
                                         </div>
                                         <div class="col-span-12 sm:col-span-1 min-w-0">
-                                            @if($itemStatusLabel === $stopStatusLabel)
-                                                {{-- The stop badge in the header above already
-                                                     carries this exact status; a second identical
-                                                     pill in the row is pure repetition. --}}
+                                            @php
+                                                /*
+                                                 * The stop status has authority over the package
+                                                 * statuses. A failed or cancelled stop whose
+                                                 * package still reads "Delivered" shows the
+                                                 * reader two contradictory badges at once, and
+                                                 * the row sits directly under the stop header,
+                                                 * so the contradiction reads as a bug rather
+                                                 * than as detail. The header wins and the row
+                                                 * is left blank.
+                                                 */
+                                                $stopVoidsPackageStatus = in_array($stop->status, ['failed', 'cancelled'], true)
+                                                    && in_array($item->status, ['delivered', 'handed_off'], true);
+                                            @endphp
+                                            @if($stopVoidsPackageStatus || $itemStatusLabel === $stopStatusLabel)
                                                 <span class="text-xs font-semibold text-slate-300">—</span>
                                             @else
                                                 <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold {{ $itemBadgeClass }}">
