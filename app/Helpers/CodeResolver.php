@@ -5,6 +5,8 @@ namespace App\Helpers;
 use App\Models\OutgoingBatch;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
+use App\Models\WarehouseReceiptItem;
+use App\Models\WarehouseReceiptItemLabel;
 
 /**
  * One place that knows how a ParcelMan code is written, and how to find it.
@@ -233,10 +235,52 @@ class CodeResolver
             return null;
         }
 
-        $item = ShipmentItem::query()->whereIn('tracking_code', self::candidates($code))->first();
+        $candidates = self::candidates($code);
+
+        $item = ShipmentItem::query()->whereIn('tracking_code', $candidates)->first();
 
         if ($item) {
             return $item;
+        }
+
+        /*
+         * Printed labels are barcoded per *label*, not per parcel.
+         *
+         * The warehouse writes `PM-XXXXXXXX-001` onto
+         * `warehouse_receipt_item_labels.barcode_value`, while the parcel's own
+         * `tracking_code` stays `PM-XXXXXXXX`. Only `tracking_code` was ever
+         * queried, so scanning a label matched nothing — and because every
+         * printed label carries the `-NNN` suffix, every printed label in the
+         * system was unscannable, not just walk-ins. The agent saw
+         * "Parcel not found in system" for a parcel that was plainly there.
+         *
+         * Resolve through the receipt item to the parcel it belongs to.
+         */
+        $label = WarehouseReceiptItemLabel::query()
+            ->whereIn('barcode_value', $candidates)
+            ->with('receiptItem:id,shipment_item_id')
+            ->first();
+
+        if ($shipmentItemId = $label?->receiptItem?->shipment_item_id) {
+            if ($viaLabel = ShipmentItem::query()->find($shipmentItemId)) {
+                return $viaLabel;
+            }
+        }
+
+        /*
+         * The parcel-level receipt barcode, for a receipt whose shipment item
+         * does not carry the same code. Cheap, and it closes the same gap from
+         * the other side.
+         */
+        $receiptItem = WarehouseReceiptItem::query()
+            ->whereIn('barcode_value', $candidates)
+            ->whereNotNull('shipment_item_id')
+            ->first();
+
+        if ($receiptItem) {
+            if ($viaReceipt = ShipmentItem::query()->find($receiptItem->shipment_item_id)) {
+                return $viaReceipt;
+            }
         }
 
         if (ctype_digit($code)) {
