@@ -18,6 +18,7 @@ use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 /**
  * The hub app's API: checking a consignment into a hub, holding it as inventory,
@@ -47,6 +48,19 @@ class HubController extends Controller
      * location rule, so inventory and bus handoff cannot drift apart again.
      */
     private const AT_HUB_STATUSES = ShipmentItem::AT_HUB_STATUSES;
+
+    /**
+     * How long an intake will spend texting recipients before it stops and reports
+     * the rest as deferred. A desk batch is small, but a pathological one must not
+     * pin a PHP worker for minutes on a slow gateway.
+     */
+    private const INTAKE_SMS_BUDGET_SECONDS = 20;
+
+    /**
+     * A hard ceiling on pickup SMS per intake request, for the same reason as the
+     * budget above: the two together bound the worst case however the clock lies.
+     */
+    private const INTAKE_SMS_MAX_PER_REQUEST = 40;
 
     /**
      * Role slugs, as the database knows them, for the two sides of the hub app.
@@ -153,7 +167,7 @@ class HubController extends Controller
      * code, or explicit package ids. A parcel that does not belong to the batch
      * it was scanned against is rejected rather than quietly accepted.
      */
-    public function intake(Request $request): JsonResponse
+    public function intake(Request $request, SmsService $smsService): JsonResponse
     {
         $validated = $request->validate([
             'batch_number' => ['nullable', 'string', 'max:60'],
@@ -230,6 +244,10 @@ class HubController extends Controller
 
         $received = [];
         $alreadyAtHub = [];
+        // Parcels whose pickup code still needs texting, gathered here and sent
+        // only after every check-in write below has finished — see that loop for
+        // why the send cannot live inside the write.
+        $pendingNotifications = [];
 
         foreach ($items as $item) {
             // Re-scanning a parcel is normal at a busy desk: report it, don't
@@ -239,6 +257,12 @@ class HubController extends Controller
 
                 continue;
             }
+
+            // Whether the code predates this intake decides the duplicate rule: a
+            // code minted just now has never been texted, so it is always safe to
+            // send, whereas one that already existed may have gone out on an
+            // earlier arrival and must not be repeated.
+            $codeExisted = filled($item->pickup_code);
 
             $item->update([
                 'hub_id' => $hub->id,
@@ -259,7 +283,7 @@ class HubController extends Controller
                 (int) $user->id
             );
 
-            $received[] = $this->serializePackage($item->fresh(), $hub);
+            $pendingNotifications[] = ['item' => $item, 'code_existed' => $codeExisted];
         }
 
         // A batch is only "received" once every parcel in it is physically at
@@ -286,6 +310,93 @@ class HubController extends Controller
             $batchStatus = $batch->fresh()?->status;
         }
 
+        // Text each recipient their pickup code, and only now that the check-in
+        // rows are written. An SMS cannot be rolled back, so it must not sit in a
+        // transaction alongside the check-in: if that transaction later failed,
+        // customers would have been texted about parcels the hub never recorded.
+        // Sent afterwards, a message can only ever describe a parcel that is
+        // really on the shelf. Every failure is caught per parcel — the parcels
+        // are physically here, and refusing the whole intake because a gateway is
+        // down would be worse than the silence.
+        $notified = 0;
+        $notificationFailed = 0;
+        $skippedNoPhone = 0;
+        $alreadyNotified = 0;
+        $deferred = 0;
+        $attempts = 0;
+
+        // Bounds the request so a batch far larger than a desk ever handles in one
+        // go cannot pin a worker for minutes; anything left over is reported as
+        // deferred, not lost, and can be sent from the Notify button on inventory.
+        $deadline = microtime(true) + self::INTAKE_SMS_BUDGET_SECONDS;
+
+        foreach ($pendingNotifications as $pending) {
+            /** @var ShipmentItem $item */
+            $item = $pending['item'];
+            $phone = $item->delivery_recipient_phone;
+
+            if (blank($phone)) {
+                // No number on file: nothing to send, and never a reason to fail
+                // the check-in. Counted so the desk can chase the recipient.
+                $skippedNoPhone++;
+                $smsStatus = 'skipped_no_phone';
+            } elseif ($pending['code_existed'] && $this->pickupSmsAlreadySent($item)) {
+                // A retry or re-scan whose existing code was already texted for
+                // this arrival — do not send the same code twice.
+                $alreadyNotified++;
+                $smsStatus = 'already_notified';
+            } elseif ($attempts >= self::INTAKE_SMS_MAX_PER_REQUEST || microtime(true) >= $deadline) {
+                $deferred++;
+                $smsStatus = 'deferred';
+            } else {
+                $attempts++;
+
+                try {
+                    $sent = $smsService->send($phone, sprintf(
+                        'ParcelMan: your parcel %s has arrived at %s. Collect it with pickup code %s.',
+                        $item->tracking_code ?: $item->id,
+                        $hub->name,
+                        $item->pickup_code
+                    ));
+                } catch (\Throwable $e) {
+                    // A gateway blow-up must never undo a physical check-in.
+                    Log::warning('Pickup SMS threw during hub intake', [
+                        'shipment_item_id' => $item->id,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    $sent = false;
+                }
+
+                if ($sent) {
+                    $notified++;
+                    $smsStatus = 'sent';
+                } else {
+                    $notificationFailed++;
+                    $smsStatus = 'failed';
+                }
+
+                // Same audit shape notifyRecipient writes, so the activity feed
+                // reads consistently and a later retry can see this code was sent.
+                $this->logTracking(
+                    $item,
+                    ItemStatus::ARRIVED_AT_HUB,
+                    $hub,
+                    $sent
+                        ? "Pickup code texted to {$item->delivery_recipient_name}"
+                        : "Pickup code to {$item->delivery_recipient_name} could not be texted",
+                    ['source' => 'hub_intake_sms', 'sent' => $sent],
+                    (int) $user->id
+                );
+            }
+
+            // The per-item outcome travels with the parcel so the app can tell the
+            // truth about each one, not just the totals.
+            $received[] = $this->serializePackage($item->fresh(), $hub) + [
+                'sms_status' => $smsStatus,
+            ];
+        }
+
         $message = $this->intakeMessage($received, $alreadyAtHub, $batch);
 
         if ($batch && $batchStatus === OutgoingBatch::STATUS_ARRIVED_AT_HUB) {
@@ -301,6 +412,13 @@ class HubController extends Controller
                 'batch_status' => $batchStatus,
                 'received_count' => count($received),
                 'already_at_hub_count' => count($alreadyAtHub),
+                // Pickup-code SMS outcome, so the app can report what really
+                // happened instead of assuming every recipient was texted.
+                'notified' => $notified,
+                'notification_failed' => $notificationFailed,
+                'skipped_no_phone' => $skippedNoPhone,
+                'already_notified' => $alreadyNotified,
+                'deferred' => $deferred,
                 'packages' => $received,
                 'already_at_hub' => $alreadyAtHub,
             ],
@@ -872,6 +990,27 @@ class HubController extends Controller
         }
 
         return (string) random_int(100000, 999999);
+    }
+
+    /**
+     * Whether this parcel's pickup code has already been texted to its recipient.
+     *
+     * The signal is the tracking trail itself: both this intake and the manual
+     * Notify button record a successful send as a `shipment_item_tracking` row
+     * whose `meta.sent` is true. That is the same durable marker the activity feed
+     * is built from, so there is no second flag to drift out of step.
+     */
+    private function pickupSmsAlreadySent(ShipmentItem $item): bool
+    {
+        return ShipmentItemTracking::query()
+            ->where('shipment_item_id', $item->id)
+            ->get()
+            ->contains(function (ShipmentItemTracking $row) {
+                $meta = is_array($row->meta) ? $row->meta : [];
+
+                return ($meta['sent'] ?? false) === true
+                    && in_array($meta['source'] ?? null, ['hub_intake_sms', 'hub_notify_recipient'], true);
+            });
     }
 
     private function logTracking(

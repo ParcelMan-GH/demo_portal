@@ -267,8 +267,14 @@ test('checking in a batch marks every parcel as arrived at the hub', function ()
             ->and($item->pickup_code)->not->toBeNull();
     }
 
-    // Audited, with the hub recorded as the location.
-    expect(ShipmentItemTracking::query()->where('status', ItemStatus::ARRIVED_AT_HUB->value)->count())->toBe(2);
+    // Audited, with the hub recorded as the location. Intake now also writes a
+    // separate row per recipient text, so count only the check-in entries here.
+    $checkIns = ShipmentItemTracking::query()
+        ->where('status', ItemStatus::ARRIVED_AT_HUB->value)
+        ->get()
+        ->filter(fn ($row) => ($row->meta['source'] ?? null) === 'hub_intake');
+
+    expect($checkIns->count())->toBe(2);
     expect(ShipmentItemTracking::query()->first()->location)->toBe($hub->name);
 });
 
@@ -327,7 +333,10 @@ test('re-scanning a parcel already at the hub does not move it twice', function 
         ->assertJsonPath('data.already_at_hub_count', 1);
 
     expect($items[0]->fresh()->arrived_at_hub_at->equalTo($firstStamp))->toBeTrue();
-    expect(ShipmentItemTracking::query()->count())->toBe(1);
+    // One check-in row; the re-scan texts nobody, so no notification row either.
+    expect(ShipmentItemTracking::query()->get()
+        ->filter(fn ($row) => ($row->meta['source'] ?? null) === 'hub_intake')
+        ->count())->toBe(1);
 });
 
 test('a shelf location can be recorded at check in', function () {
