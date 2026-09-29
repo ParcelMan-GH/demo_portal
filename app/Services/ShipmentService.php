@@ -689,8 +689,15 @@ class ShipmentService
                 : false,
 
             'can_edit' => $shipment->canBeEdited(),
+            /*
+             * Must list what UpdateShipmentRequest actually accepts for a
+             * submitted shipment, or a client hides a control the API would have
+             * taken. `vendor_declared_quantity` was already accepted but missing
+             * here; `requested_vehicles` is accepted and has to stay editable
+             * until the parcel is assigned to a rider.
+             */
             'can_edit_fields' => $shipment->canBeEdited() && $shipment->status === ShipmentStatus::SUBMITTED
-                ? ['destination_mode', 'pickup_town', 'sender_notes', 'photos']
+                ? ['destination_mode', 'pickup_town', 'sender_notes', 'vendor_declared_quantity', 'requested_vehicles', 'photos']
                 : ($shipment->canBeEdited() ? ['all'] : []),
             'can_delete' => $shipment->canBeDeleted(),
             'can_submit' => $shipment->canBeSubmitted(),

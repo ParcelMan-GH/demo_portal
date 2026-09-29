@@ -19,11 +19,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Server-side label reading. Bound to one implementation so a different
-        // provider (Textract, a vision model) is a single class plus a line here.
+        /*
+         * Server-side label reading. Bound to one implementation so a different
+         * provider (Textract, a vision model) is a single class plus a line here.
+         *
+         * Wrapped in the preprocessor so every read runs against an auto-oriented,
+         * contrast-stretched, binarised image, whichever engine is bound. The
+         * engine is constructed here rather than resolved through the interface,
+         * so the wrapper can never end up decorating itself.
+         */
         $this->app->bind(
             \App\Contracts\LabelTextExtractor::class,
-            \App\Services\Ocr\GoogleVisionLabelExtractor::class,
+            fn ($app) => new \App\Services\Ocr\PreprocessedLabelExtractor(
+                $app->make(\App\Services\Ocr\GoogleVisionLabelExtractor::class),
+                $app->make(\App\Services\Ocr\LabelImagePreprocessor::class),
+            ),
         );
     }
 
