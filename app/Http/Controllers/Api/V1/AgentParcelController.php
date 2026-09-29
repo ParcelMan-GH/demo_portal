@@ -142,7 +142,17 @@ class AgentParcelController extends Controller
             'success' => true,
             'data' => [
                 'claimed_today' => $claimedToday,
-                'pending_calls' => ShipmentItem::where('agent_id', $agent->id)->where('status', ItemStatus::PICKED_UP)->count(),
+                /*
+                 * Same exclusion as getQueue(). Counting raw PICKED_UP here made
+                 * the Home tile disagree with the Call Queue on the very next
+                 * screen — a parcel that had already been called was still
+                 * counted as waiting for one. This is the number the agent
+                 * decides what to do next from, so it has to match the list.
+                 */
+                'pending_calls' => ShipmentItem::where('agent_id', $agent->id)
+                    ->where('status', ItemStatus::PICKED_UP)
+                    ->whereDoesntHave('agentCallLogs')
+                    ->count(),
                 'rescheduled' => AgentCallLog::where('agent_id', $agent->id)
                     ->where('outcome', AgentCallLog::OUTCOME_RESCHEDULED)
                     ->whereDate('created_at', today())
