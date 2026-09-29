@@ -198,7 +198,10 @@ class DriverDeliveryController extends Controller
             'packages_delivered' => ['required', 'integer', 'min:0'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'proof_photo' => ['required', 'file', 'image', 'max:12288'],
+            // Optional: a rider who cannot take a photo should still be able to
+            // close the stop. The column is nullable, and the app already omits
+            // the part when it has nothing to send.
+            'proof_photo' => ['nullable', 'file', 'image', 'max:12288'],
             'delivery_notes' => ['nullable', 'string', 'max:1000'],
             // Optional: the delivery fee the driver collected from the recipient
             // on arrival (for stops where the fee wasn't set in advance, or

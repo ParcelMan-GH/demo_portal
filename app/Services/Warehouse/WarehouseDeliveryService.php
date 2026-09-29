@@ -1194,7 +1194,7 @@ class WarehouseDeliveryService
         int $packagesDelivered,
         ?float $latitude,
         ?float $longitude,
-        UploadedFile $proofPhoto,
+        ?UploadedFile $proofPhoto = null,
         ?string $ipAddress = null,
         bool $skipVerification = false,
         ?string $skipReason = null,
@@ -1255,10 +1255,14 @@ class WarehouseDeliveryService
 
             $totalPackages = (int) $stop->total_packages ?: $runItems->count();
 
-            $upload = $this->storageService->upload(
-                $proofPhoto,
-                "deliveries/runs/{$run->id}/stops/{$stop->id}"
-            );
+            // The photo is optional, so only touch storage when one arrived.
+            // StorageService::upload() takes a non-nullable UploadedFile.
+            $upload = $proofPhoto
+                ? $this->storageService->upload(
+                    $proofPhoto,
+                    "deliveries/runs/{$run->id}/stops/{$stop->id}"
+                )
+                : null;
 
             $allDelivered = $packagesDelivered >= $totalPackages;
             $noneDelivered = $packagesDelivered <= 0;
@@ -1337,8 +1341,8 @@ class WarehouseDeliveryService
                 'delivered_at' => $now,
                 'delivery_latitude' => $latitude,
                 'delivery_longitude' => $longitude,
-                'proof_photo_path' => $upload['path'],
-                'proof_photo_size' => $upload['size'],
+                'proof_photo_path' => $upload['path'] ?? null,
+                'proof_photo_size' => $upload['size'] ?? null,
                 'failure_reason' => $allDelivered ? null : ($noneDelivered ? 'no_packages_delivered' : 'partial_packages'),
                 'failure_notes' => $allDelivered ? null : "{$packagesDelivered} of {$totalPackages} packages delivered. Requires warehouse review.",
                 'delivery_notes' => $deliveryNotes,
