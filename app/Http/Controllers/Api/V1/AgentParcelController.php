@@ -6,6 +6,8 @@ use App\Enums\ItemStatus;
 use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\AgentCallLog;
+use App\Models\AgentDailyQuota;
+use App\Models\CommissionTier;
 use App\Models\OutgoingBatchAssignmentEvent;
 use App\Models\ShipmentItem;
 use App\Services\OutgoingBatchAutoAssignmentService;
@@ -286,6 +288,55 @@ class AgentParcelController extends Controller
                  */
                 $locked->update(['status' => ItemStatus::PENDING]);
 
+                /*
+                 * Credit the calling agent's daily commission ledger.
+                 *
+                 * This is the piece the API path never had. Logging a call wrote
+                 * the log and moved the parcel, but nothing ever touched
+                 * `agent_daily_quotas`, so an agent who worked entirely through
+                 * the app earned nothing, ever — no matter how many payments
+                 * they confirmed. The dashboard has always credited on approval
+                 * (and, until now, credited a hardcoded user id); here it is
+                 * keyed on the authenticated agent, so the money lands on the
+                 * person who actually made the call.
+                 *
+                 * Only the confirmed (paid) outcome credits anything:
+                 * rescheduled / unreachable / cancelled are not money. The
+                 * amount is whatever `parseAmount()` managed to read; an
+                 * unreadable amount counts as 0, never a failed call.
+                 *
+                 * The row is created on the first confirmed call of the day via
+                 * the unique (user_id, tracking_date) pair, then re-read under a
+                 * row lock: without the lock two confirmed calls for the same
+                 * agent committing at the same instant could both read the same
+                 * `collected_amount` and one credit would be lost. `assigned_tasks`
+                 * is deliberately left alone — nothing in this API path assigns a
+                 * quota of tasks, and inventing one would make `hasClearedList()`
+                 * report against a target that was never set.
+                 *
+                 * `earned_commission` is recomputed from the same `CommissionTier`
+                 * lookup the admin ledger uses and *stored*, so the row is
+                 * accurate on its own rather than left at its 0.00 default.
+                 */
+                $quota = AgentDailyQuota::firstOrCreate([
+                    'user_id' => $agent->id,
+                    'tracking_date' => today()->toDateString(),
+                ]);
+
+                $quota = AgentDailyQuota::query()
+                    ->whereKey($quota->getKey())
+                    ->lockForUpdate()
+                    ->first() ?? $quota;
+
+                $collected = (float) $quota->collected_amount + (float) ($log->amount_paid ?? 0);
+                $tier = CommissionTier::findTierForAmount($collected);
+
+                $quota->update([
+                    'completed_tasks' => $quota->completed_tasks + 1,
+                    'collected_amount' => $collected,
+                    'earned_commission' => $tier?->payout_amount ?? 0.00,
+                ]);
+
                 $assignment = $autoBatching->assignForDestination(
                     $locked->fresh(),
                     OutgoingBatchAssignmentEvent::SOURCE_AGENT_CALL,
@@ -411,6 +462,106 @@ class AgentParcelController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * The authenticated agent's earnings summary and recent commission activity.
+     *
+     * This endpoint previously did not exist at all. `routes/api.php` pointed
+     * GET /api/v1/agent/earnings at this method, which was never written, so the
+     * request 500'd, the app swallowed the error and fell back to its literal
+     * defaults — the Earnings screen showed "GH₵ 0.00" no matter how much the
+     * agent had collected.
+     *
+     * It reads the same `agent_daily_quotas` ledger the admin uses and derives
+     * each day's commission with the same `CommissionTier::findTierForAmount()`
+     * lookup as Admin\CommissionLedgerController — deliberately *not* from the
+     * stored `earned_commission` column — so the agent app and the admin ledger
+     * can never disagree. The column is still kept accurate by logCall() for
+     * audits and direct queries; this endpoint simply treats the tier lookup as
+     * the source of truth, exactly as the ledger view does.
+     *
+     * The screen renders these values *directly as strings* (`{balance}`,
+     * `{totalEarned}`), so they are returned display-ready ("GH₵ 12.00") — a
+     * bare number would render with no currency symbol. The activity rows match
+     * the screen's `ActivityItem` shape: id / title / code / date / amount /
+     * isPayout, where `code` and `date` are joined as "<code> • <date>".
+     *
+     * Balance semantics: a day's commission is *available* only once its quota
+     * has been unlocked for payout. The schema default is `is_unlocked = false`
+     * / `payout_status = 'locked'`; only the admin override flips them to
+     * true / 'unlocked'. `total_earned` counts every day's commission, unlocked
+     * or not, while `available_balance` counts only the unlocked days. Nothing
+     * in the schema records a "paid" state, so unlocked is read as payable.
+     */
+    public function earnings(Request $request)
+    {
+        $agent = $request->user();
+
+        /*
+         * One row per agent per day, so this is bounded by tenure rather than by
+         * calls. Newest first, which makes the activity list a simple prefix of
+         * the same collection and lets the totals be computed in one pass.
+         */
+        $quotas = AgentDailyQuota::query()
+            ->where('user_id', $agent->id)
+            ->orderByDesc('tracking_date')
+            ->orderByDesc('id')
+            ->get();
+
+        $totalEarned = 0.0;
+        $availableBalance = 0.0;
+        $earnedByQuota = [];
+
+        foreach ($quotas as $quota) {
+            // Same derivation the admin ledger uses, so both screens agree.
+            $tier = CommissionTier::findTierForAmount((float) $quota->collected_amount);
+            $earned = (float) ($tier?->payout_amount ?? 0.00);
+
+            $earnedByQuota[$quota->getKey()] = $earned;
+            $totalEarned += $earned;
+
+            if ($quota->is_unlocked || $quota->payout_status === 'unlocked') {
+                $availableBalance += $earned;
+            }
+        }
+
+        /*
+         * Bounded on purpose: the screen only ever renders a scroll list, and an
+         * unbounded history would grow without limit. Fifty recent days is more
+         * than the list can show and keeps the payload small. The totals above
+         * are all-time and are not limited by this slice.
+         */
+        $activities = $quotas->take(50)->map(function (AgentDailyQuota $quota) use ($earnedByQuota) {
+            $calls = (int) $quota->completed_tasks;
+
+            return [
+                'id' => (string) $quota->getKey(),
+                'title' => 'Commission earned',
+                'code' => $calls.' '.($calls === 1 ? 'call' : 'calls'),
+                'date' => optional($quota->tracking_date)->format('M j, Y'),
+                'amount' => $this->formatMoney($earnedByQuota[$quota->getKey()] ?? 0.00),
+                'isPayout' => false,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'available_balance' => $this->formatMoney($availableBalance),
+                'total_earned' => $this->formatMoney($totalEarned),
+                'activities' => $activities,
+            ],
+        ]);
+    }
+
+    /**
+     * Format an amount the way the agent app's own fallback does ("GH₵ 0.00"),
+     * so a populated response and an empty one are rendered identically.
+     */
+    protected function formatMoney(float $amount): string
+    {
+        return 'GH₵ '.number_format($amount, 2);
     }
 
     /**
