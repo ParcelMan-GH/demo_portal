@@ -62,8 +62,12 @@ class UserPayoutAccountService
         if ($method === self::METHOD_MOMO) {
             $user->payout_momo_network = $data['momo_network'];
             $user->payout_bank_name = null;
-            // Stored in the local 0XXXXXXXXX form, as the vendor flow does, so
-            // one column never holds two shapes.
+            /*
+             * PhoneHelper::format returns the E.164 shape — a `+233508936615`
+             * input round-trips to exactly that — and it is the same call the
+             * vendor flow makes, so wallet numbers are stored consistently
+             * across both tables.
+             */
             $user->payout_account_number = PhoneHelper::format($data['account_number']);
         } else {
             $user->payout_bank_name = $data['bank_name'];
