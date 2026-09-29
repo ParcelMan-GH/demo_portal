@@ -5,9 +5,20 @@ use App\Models\Shipment;
 
 class ShipmentObserver
 {
-    public function updating(Shipment $shipment): void
+    /**
+     * `updated`, not `updating`.
+     *
+     * Firing while the write was still pending meant the event described a change
+     * that had not happened yet: a failed write, or a transaction that later
+     * rolled back, had already texted and emailed the customer about a status the
+     * database never kept. `updated` runs only once the row is really written, and
+     * `getOriginal('status')` still holds the previous value here because
+     * `syncOriginal()` runs after the event.
+     */
+    public function updated(Shipment $shipment): void
     {
-        if ($shipment->isDirty('status')) {
+        // `wasChanged`, not `isDirty`: the observer now runs after the write.
+        if ($shipment->wasChanged('status')) {
             $oldStatus = $shipment->getOriginal('status');
             $newStatus = $shipment->status;
 
