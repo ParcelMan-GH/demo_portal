@@ -289,6 +289,11 @@ class HubBusHandoffService
      * than failing the whole dispatch — a hub does not hold up a loaded bus for
      * one parcel that is not in the pile.
      *
+     * The handover photo is optional: the dispatch form no longer captures one,
+     * so `$photo` may be null. When it is, the handoff is still recorded but with
+     * no photo attached — historical rows keep theirs, and `payload()` reports
+     * `has_proof_photo: false` for these.
+     *
      * @param  \Illuminate\Support\Collection<int, ShipmentItem>  $items
      * @return array{success: bool, message: string, status: int, data?: array}
      */
@@ -297,7 +302,7 @@ class HubBusHandoffService
         User $agent,
         $items,
         array $attributes,
-        UploadedFile $photo,
+        ?UploadedFile $photo,
         ?string $destination = null,
         ?string $groupLabel = null
     ): array {
@@ -305,11 +310,12 @@ class HubBusHandoffService
         $skipped = [];
 
         $created = DB::transaction(function () use ($hub, $agent, $items, $attributes, $photo, $destination, $groupLabel, &$notify, &$skipped) {
-            // One upload for the load. Grouped under the batch when there is one
-            // so the admin's file listing lines up with the dispatch.
-            // Same folder as a single handover: one photo per load, shared by
-            // every parcel's record.
-            $upload = $this->storageService->upload($photo, self::PHOTO_DIRECTORY);
+            // One upload for the load, when there is one. Grouped under the batch
+            // when there is one so the admin's file listing lines up with the
+            // dispatch. Same folder as a single handover: one photo per load,
+            // shared by every parcel's record. No photo on the reduced form means
+            // no upload at all, not a failed dispatch.
+            $upload = $photo ? $this->storageService->upload($photo, self::PHOTO_DIRECTORY) : null;
 
             $now = now();
             $handoffs = [];
@@ -334,7 +340,8 @@ class HubBusHandoffService
                     'hub_id' => $hub->id,
                     'outgoing_batch_id' => $locked->outgoing_batch_id,
                     'handed_off_by' => $agent->id,
-                    'driver_name' => $attributes['driver_name'],
+                    // Nullable now that the form no longer sends a driver name.
+                    'driver_name' => $attributes['driver_name'] ?? null,
                     'driver_phone' => $attributes['driver_phone'] ?? null,
                     'driver_id_number' => $attributes['driver_id_number'] ?? null,
                     'vehicle_plate' => $attributes['vehicle_plate'] ?? null,
@@ -342,9 +349,11 @@ class HubBusHandoffService
                     'bus_company' => $attributes['bus_company'] ?? null,
                     'destination' => $destination,
                     'departure_at' => $attributes['departure_at'] ?? $now,
-                    'proof_photo_path' => $upload['path'],
+                    // Null when no photo was sent: the column keeps its value for
+                    // historical rows, it is simply empty for these.
+                    'proof_photo_path' => $upload['path'] ?? null,
                     'proof_photo_size' => $upload['size'] ?? null,
-                    'proof_photo_taken_at' => $attributes['photo_taken_at'] ?? $now,
+                    'proof_photo_taken_at' => $upload ? ($attributes['photo_taken_at'] ?? $now) : null,
                     'notes' => $attributes['notes'] ?? null,
                 ]);
 
@@ -357,7 +366,9 @@ class HubBusHandoffService
                     'shipment_item_id' => $locked->id,
                     'status' => ItemStatus::DISPATCHED_TO_BUS->value,
                     'location' => $hub->name,
-                    'notes' => 'Handed to bus driver '.$handoff->driver_name
+                    // The driver's name is optional now, so fall back to a
+                    // nameless phrasing rather than writing "driver " and a gap.
+                    'notes' => 'Handed to '.($handoff->driver_name ?: 'the bus driver')
                         .($handoff->vehicle_plate ? " ({$handoff->vehicle_plate})" : '')
                         .($destination ? " for {$destination}" : '')
                         .($groupLabel ? " with {$groupLabel}" : ''),
@@ -452,8 +463,14 @@ class HubBusHandoffService
         $link = $this->urlForToken($token);
         $tracking = $handoff->shipmentItem?->tracking_code ?: 'your package';
 
+        // The reduced dispatch form no longer always captures a photo, so only
+        // promise one when the handoff has it. The link opens the handover
+        // either way (the public page hides the photo block when there is none).
         $message = "ParcelMan: {$tracking} has been handed to the bus. "
-            .'See the photo of the handover: '.$link;
+            .(filled($handoff->proof_photo_path)
+                ? 'See the photo of the handover: '
+                : 'Follow the handover: ')
+            .$link;
 
         try {
             $sent = $this->smsService->send(
@@ -581,6 +598,10 @@ class HubBusHandoffService
                 'company' => $handoff->bus_company,
             ],
             'destination' => $handoff->destination,
+            // Both tolerate a handoff with no photo: `filled()` is false for a
+            // null path, and `photoUrl()` returns null for one, so a batch sent
+            // without a photo serialises cleanly as has_proof_photo=false and a
+            // null url.
             'has_proof_photo' => filled($handoff->proof_photo_path),
             'proof_photo_url' => $includePhotoUrl ? $this->photoUrl($handoff) : null,
             'notes' => $handoff->notes,

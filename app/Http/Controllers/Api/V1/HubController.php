@@ -520,7 +520,11 @@ class HubController extends Controller
             'package_ids' => ['nullable', 'array'],
             'package_ids.*' => ['integer'],
             'transport_driver_id' => ['nullable', 'integer'],
-            'driver_name' => ['required', 'string', 'max:120'],
+            // The dispatch form was reduced to four details (car company,
+            // driver number, car number, car description), so the driver's name
+            // is no longer sent and must not be required. A direct caller may
+            // still supply it.
+            'driver_name' => ['nullable', 'string', 'max:120'],
             'driver_phone' => ['nullable', 'string', 'max:30'],
             'driver_id_number' => ['nullable', 'string', 'max:60'],
             'vehicle_plate' => ['nullable', 'string', 'max:30'],
@@ -528,9 +532,11 @@ class HubController extends Controller
             'bus_company' => ['nullable', 'string', 'max:120'],
             'departure_time' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
-            // Same rule as the single-parcel flow: no photo, no handover. A
-            // batch is still a physical handover and needs the same evidence.
-            'proof_photo' => ['required', 'file', 'image', 'max:10240'],
+            // The form no longer captures a handover photo, so it is optional
+            // here. The single-parcel flow still requires one, and rows that
+            // already have a photo keep it — this only means a batch sent
+            // without a photo stores no `proof_photo_path` instead of 422ing.
+            'proof_photo' => ['nullable', 'file', 'image', 'max:10240'],
         ]);
 
         $user = $request->user();
