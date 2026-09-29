@@ -8,6 +8,7 @@ use App\Helpers\CodeResolver;
 use App\Models\Driver;
 use App\Models\PlatformSetting;
 use App\Models\Shipment;
+use App\Models\OutgoingBatch;
 use App\Models\ShipmentItemTracking;
 use App\Models\SortBatch;
 use App\Models\TransportContainer;
@@ -769,6 +770,60 @@ class WarehouseTransportService
      * reads "Ready" at the warehouse) and `assigned`. Claiming never resurrects
      * a box that is already on the road or already closed.
      */
+    /**
+     * Keep a manifest pointed at the hub its batch names.
+     *
+     * A batch's destination hub can be corrected after the batch was dispatched,
+     * and the batch's own region can disagree with the hub it is addressed to.
+     * A manifest raised from the old value would then disagree with the portal
+     * for the rest of its life — which is how the app came to tell a driver
+     * "Greater Accra" for a batch the portal showed as Kumasi.
+     *
+     * Only a manifest that has not departed is re-pointed. Once it is on the
+     * road, where it is going is a routing decision for a person, not a side
+     * effect of a scan.
+     */
+    public function alignManifestDestination(TransportManifest $manifest, OutgoingBatch $batch): TransportManifest
+    {
+        $chosen = $batch->destination_warehouse_id;
+
+        if (! $chosen) {
+            return $manifest;
+        }
+
+        if ((int) $manifest->destination_warehouse_id === (int) $chosen) {
+            return $manifest;
+        }
+
+        if ($manifest->dispatched_at !== null) {
+            return $manifest;
+        }
+
+        if (! in_array($manifest->status, [TransportManifest::STATUS_DRAFT, TransportManifest::STATUS_ASSIGNED], true)) {
+            return $manifest;
+        }
+
+        // A hub that no longer exists is not a destination; leave the manifest be
+        // rather than pointing it at a warehouse that has been removed.
+        if (! Warehouse::query()->whereKey($chosen)->exists()) {
+            return $manifest;
+        }
+
+        $manifest->update(['destination_warehouse_id' => (int) $chosen]);
+
+        // `logger()`, not the `Log` facade: this class does not import it, and a
+        // missing import on this line is not a log line — it is a throw, which the
+        // caller catches and reports to the operator as "no destination hub
+        // warehouse matched this region" for a batch whose hub was just set.
+        logger()->info('Transport manifest re-pointed at its batch destination', [
+            'manifest' => $manifest->manifest_number,
+            'batch' => $batch->batch_number,
+            'destination_warehouse_id' => (int) $chosen,
+        ]);
+
+        return $manifest->fresh();
+    }
+
     /**
      * Which trip a batch belongs to.
      *

@@ -69,13 +69,29 @@ class DriverTransportController extends Controller
                 ->first()
                 ?? ($driver->warehouse_id ?? null);
 
-            $destinationQuery = Warehouse::query()->where('is_active', true);
+            /*
+             * The hub the batch is addressed to, exactly as the portal shows it.
+             *
+             * This looked the destination up from the batch's region and then fell
+             * back to the ORIGIN warehouse when nothing matched. Both were wrong
+             * for the same reason: a batch's region can disagree with the hub it is
+             * actually going to, and inventing the origin produced a manifest
+             * naming the hub the boxes were already standing in, so the app showed
+             * Greater Accra for a batch the portal showed as Kumasi.
+             */
+            $destinationId = null;
 
-            if (Schema::hasColumn('warehouses', 'region_id') && $batch->delivery_region_id) {
-                $destinationQuery->where('region_id', $batch->delivery_region_id);
+            if (! empty($batch->destination_warehouse_id)
+                && Warehouse::query()->whereKey($batch->destination_warehouse_id)->exists()) {
+                $destinationId = (int) $batch->destination_warehouse_id;
             }
 
-            $destinationId = (clone $destinationQuery)->orderBy('id')->value('id') ?? $originId;
+            if (! $destinationId) {
+                $destinationId = OutgoingBatch::resolveDestinationWarehouseId(
+                    $batch->delivery_region_id ? (int) $batch->delivery_region_id : null,
+                    $batch->delivery_district_id ? (int) $batch->delivery_district_id : null
+                );
+            }
 
             if (! $originId || ! $destinationId) {
                 Log::warning('Bridge skipped: no warehouse could be resolved', ['batch' => $code]);

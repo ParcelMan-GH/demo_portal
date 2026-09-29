@@ -16,6 +16,7 @@ use App\Models\TransportManifestItem;
 use App\Models\Warehouse;
 use App\Services\BackOfficeAccess;
 use App\Services\Warehouse\TransportLabelService;
+use App\Services\Warehouse\WarehouseTransportService;
 use App\Services\OutgoingBatchPackageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,6 +31,7 @@ class AdminTransportManifestController extends Controller
     public function __construct(
         private readonly BackOfficeAccess $access,
         private readonly OutgoingBatchPackageService $packageService,
+        private readonly WarehouseTransportService $transportService,
     ) {}
 
     // ==========================================
@@ -541,7 +543,10 @@ class AdminTransportManifestController extends Controller
             ->first();
 
         if ($existing) {
-            return $existing;
+            // A manifest already raised for this batch still has to name the hub
+            // the batch now names. Without this, correcting a batch's destination
+            // and dispatching again left the driver looking at the old hub.
+            return $this->transportService->alignManifestDestination($existing, $batch);
         }
 
         $user = Auth::guard('admin')->user();
@@ -626,11 +631,32 @@ class AdminTransportManifestController extends Controller
 
     protected function resolveDestinationWarehouse(OutgoingBatch $batch): ?Warehouse
     {
-        // The rule lives on the model now, so a batch and the manifest raised for
-        // it cannot name different destinations.
+        /*
+         * The hub the operator chose wins.
+         *
+         * `delivery_region_id` is not the authority here, and treating it as one
+         * is what put two different answers on one batch: the Outgoing Batches
+         * screen lets an operator pick a destination hub explicitly, and a
+         * batch's region can disagree with both that choice and the parcels
+         * loaded onto it. The portal's Destination Hub column reads this column,
+         * so a manifest derived from the region showed the driver a different hub
+         * from the one the portal promised — the app said Greater Accra for a
+         * batch the portal showed as Kumasi.
+         *
+         * The region derivation stays as the fallback, for batches created
+         * without an explicit hub and for older rows.
+         */
+        if ($batch->destination_warehouse_id) {
+            $chosen = Warehouse::query()->find($batch->destination_warehouse_id);
+
+            if ($chosen) {
+                return $chosen;
+            }
+        }
+
         $id = OutgoingBatch::resolveDestinationWarehouseId(
-            $batch->delivery_region_id,
-            $batch->delivery_district_id
+            $batch->delivery_region_id ? (int) $batch->delivery_region_id : null,
+            $batch->delivery_district_id ? (int) $batch->delivery_district_id : null
         );
 
         return $id ? Warehouse::query()->find($id) : null;
