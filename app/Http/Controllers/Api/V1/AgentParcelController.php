@@ -205,11 +205,44 @@ class AgentParcelController extends Controller
                  * earnings endpoint resolve it. The stored column is not trusted
                  * alone because a band can change after the row was written.
                  */
+                /*
+                 * Today's cycle if there is one, otherwise the most recent cycle
+                 * that has NOT been paid out yet.
+                 *
+                 * Scoping this strictly to `today()` was why the header read
+                 * GH₵0.00 the morning after a collection. An agent who brought in
+                 * 3500 yesterday has earned 120 and is still owed it — the row is
+                 * right there with payout_status `locked` — but a calendar-day
+                 * lookup found no row for today and reported nothing. To the agent
+                 * that is indistinguishable from the commission not working.
+                 *
+                 * Stopping at the newest UNPAID cycle keeps the number honest:
+                 * once a cycle is paid it drops out and the figure reflects the
+                 * cycle being worked now. It is deliberately not "the newest row
+                 * whenever", which would keep showing a month-old payout as if it
+                 * were current.
+                 */
                 'today_commission' => (float) (CommissionTier::findTierForAmount(
                     (float) (AgentDailyQuota::where('user_id', $agent->id)
-                        ->whereDate('tracking_date', today())
+                        ->where(function ($query) {
+                            $query->whereDate('tracking_date', today())
+                                ->orWhere(fn ($q) => $q->where('payout_status', '!=', 'paid'));
+                        })
+                        ->orderByDesc('tracking_date')
                         ->value('collected_amount') ?? 0.0)
                 )?->payout_amount ?? 0.0),
+
+                /*
+                 * Which cycle that figure belongs to, so the app can say so
+                 * rather than presenting a figure with no date attached.
+                 */
+                'commission_cycle_date' => AgentDailyQuota::where('user_id', $agent->id)
+                    ->where(function ($query) {
+                        $query->whereDate('tracking_date', today())
+                            ->orWhere(fn ($q) => $q->where('payout_status', '!=', 'paid'));
+                    })
+                    ->orderByDesc('tracking_date')
+                    ->value('tracking_date'),
             ]
         ]);
     }
