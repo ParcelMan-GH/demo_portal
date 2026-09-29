@@ -90,7 +90,15 @@ class AgentParcelController extends Controller
          */
         $parcels = ShipmentItem::where('agent_id', $agent->id)
             ->where('status', ItemStatus::PICKED_UP)
-            ->whereDoesntHave('agentCallLogs')
+            /*
+             * Scoped to THIS agent. Unscoped, the question was "has this parcel
+             * ever been called by anybody?", so a parcel that a previous agent
+             * called in an earlier cycle was hidden from the agent who has just
+             * claimed it — the queue looked empty while the Home screen counted
+             * the parcel as claimed. The queue means "parcels I still have to
+             * ring", so only this agent's own calls should take one out of it.
+             */
+            ->whereDoesntHave('agentCallLogs', fn ($query) => $query->where('agent_id', $agent->id))
             ->latest()
             ->get();
 
@@ -151,9 +159,11 @@ class AgentParcelController extends Controller
                  * counted as waiting for one. This is the number the agent
                  * decides what to do next from, so it has to match the list.
                  */
+                // Same scoping as getQueue(), or this count would disagree with
+                // the list one screen away.
                 'pending_calls' => ShipmentItem::where('agent_id', $agent->id)
                     ->where('status', ItemStatus::PICKED_UP)
-                    ->whereDoesntHave('agentCallLogs')
+                    ->whereDoesntHave('agentCallLogs', fn ($query) => $query->where('agent_id', $agent->id))
                     ->count(),
                 'rescheduled' => AgentCallLog::where('agent_id', $agent->id)
                     ->where('outcome', AgentCallLog::OUTCOME_RESCHEDULED)
