@@ -119,6 +119,8 @@ class UpdateShipmentRequest extends FormRequest
             'pickup_contact_phone_confirm.same' => 'Pickup phone numbers do not match.',
             'delivery_recipient_phone_confirm.same' => 'Delivery phone numbers do not match.',
             'requested_vehicles.min' => 'Select at least one pickup vehicle.',
+            // See CreateShipmentRequest: an unresolved `type` slug lands here.
+            'requested_vehicles.*.vehicle_type_id.required' => 'One of the selected pickup vehicles is no longer available. Please choose it again.',
         ];
     }
 

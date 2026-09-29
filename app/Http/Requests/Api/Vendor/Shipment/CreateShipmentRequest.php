@@ -177,6 +177,13 @@ class CreateShipmentRequest extends FormRequest
             'items.*.images.*.mimes' => 'Images must be JPEG, PNG, or WebP.',
             'requested_vehicles.required' => 'Select at least one pickup vehicle.',
             'requested_vehicles.min' => 'Select at least one pickup vehicle.',
+            /*
+             * A `type` slug that does not resolve is normalised to a null id, so
+             * it surfaces on this rule. The default message ("the
+             * vehicle_type_id field is required") is misleading when the client
+             * sent a slug, so say what actually happened.
+             */
+            'requested_vehicles.*.vehicle_type_id.required' => 'One of the selected pickup vehicles is no longer available. Please choose it again.',
         ];
     }
 
