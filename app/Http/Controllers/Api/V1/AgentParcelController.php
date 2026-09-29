@@ -366,16 +366,43 @@ class AgentParcelController extends Controller
         $perPage = (int) $request->input('per_page', 25);
         $perPage = max(1, min($perPage, 100));
 
+        /*
+         * The column list is explicit, so a field not named here is simply never
+         * sent — it is not a missing column on the model.
+         *
+         * It named the recipient and the phone but *no location at all*, which is
+         * why the Call Log card had nothing to put under a "Location" label: the
+         * app was not failing to read the field, it was never given one. The
+         * location columns and the region/district relations are now selected, and
+         * each row carries a ready-made `delivery_location_label` so the app does
+         * not have to re-implement the same fallback logic the SMS uses.
+         */
         $logs = AgentCallLog::query()
             ->where('agent_id', $agent->id)
-            ->with(['shipmentItem:id,tracking_code,status,description,delivery_recipient_name,delivery_recipient_phone,delivery_region_id,delivery_district_id,outgoing_batch_id'])
+            ->with(['shipmentItem:id,tracking_code,status,description,delivery_recipient_name,delivery_recipient_phone,delivery_town,delivery_landmark,delivery_gh_post_address,delivery_region_id,delivery_district_id,outgoing_batch_id'])
+            // Eager-loaded, not lazy: the label joins region and district names,
+            // and a page of 25 call logs would otherwise fire up to 50 extra
+            // queries to build them.
+            ->with(['shipmentItem.deliveryRegion:id,name', 'shipmentItem.deliveryDistrict:id,name'])
             ->latest('id')
             ->paginate($perPage);
+
+        $rows = collect($logs->items())->map(function (AgentCallLog $log) {
+            $item = $log->shipmentItem;
+
+            if ($item) {
+                // Set as an attribute so it serialises with the row the app
+                // already reads, rather than in a parallel structure.
+                $item->setAttribute('delivery_location_label', $item->deliveryLocationLabel());
+            }
+
+            return $log;
+        });
 
         return response()->json([
             'success' => true,
             'data' => [
-                'call_logs' => $logs->items(),
+                'call_logs' => $rows,
                 'pagination' => [
                     'current_page' => $logs->currentPage(),
                     'per_page' => $logs->perPage(),
