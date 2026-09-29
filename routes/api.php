@@ -111,6 +111,14 @@ Route::prefix('v1/user')->middleware('auth:sanctum')->group(function () {
     // Name / phone / email. Separate from the photo so an agent can save details
     // without re-uploading an image, and the photo without touching their name.
     Route::post('profile', [UserProfileController::class, 'update']);
+
+    /*
+     * Where this user gets paid. Lives here rather than under /agent or /driver
+     * because the columns are on `users` and the same person may work in two
+     * roles; the vendor flow keeps its own copy on `vendors`.
+     */
+    Route::get('payout-account', [UserProfileController::class, 'payoutAccount']);
+    Route::put('payout-account', [UserProfileController::class, 'updatePayoutAccount']);
 });
 
 Route::prefix('v1/agent')->middleware(['auth:sanctum'])->group(function () {

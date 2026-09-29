@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\ProfilePhotoService;
+use App\Services\UserPayoutAccountService;
 use App\Services\UserProfileService;
+use App\Support\PhoneHelper;
 use App\Support\PhoneNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +23,10 @@ use Illuminate\Validation\ValidationException;
  */
 class UserProfileController extends Controller
 {
-    public function __construct(private UserProfileService $service) {}
+    public function __construct(
+        private UserProfileService $service,
+        private UserPayoutAccountService $payoutAccounts,
+    ) {}
 
     /**
      * The signed-in user, with an absolute photo URL.
@@ -82,5 +87,69 @@ class UserProfileController extends Controller
         }
 
         return response()->json($this->service->update($user, $validated));
+    }
+
+    /**
+     * The signed-in user's payout account.
+     *
+     * The agent app has always had a screen for this and never had an endpoint,
+     * so whatever the rider typed went nowhere.
+     */
+    public function payoutAccount(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'message' => 'Payout account retrieved.',
+            'data' => ['payout_account' => $this->payoutAccounts->format($request->user())],
+        ]);
+    }
+
+    /**
+     * Save the signed-in user's payout account.
+     *
+     * Momo and bank are different shapes, so each validates its own fields and
+     * the service clears the other's. Without that, switching from a wallet to a
+     * bank would leave the old network on the row and the record would claim two
+     * accounts at once.
+     */
+    public function updatePayoutAccount(Request $request): JsonResponse
+    {
+        $method = $request->input('method');
+        $momo = UserPayoutAccountService::METHOD_MOMO;
+        $bank = UserPayoutAccountService::METHOD_BANK;
+
+        $validated = $request->validate([
+            'method' => ['required', Rule::in([$momo, $bank])],
+            'account_name' => ['required', 'string', 'max:255'],
+            'momo_network' => [
+                'nullable',
+                'required_if:method,'.$momo,
+                Rule::in(UserPayoutAccountService::MOMO_NETWORKS),
+            ],
+            'bank_name' => [
+                'nullable',
+                'required_if:method,'.$bank,
+                'string',
+                'max:120',
+            ],
+            'account_number' => ['required', 'string', 'max:20', function ($attribute, $value, $fail) use ($momo, $bank, $method) {
+                if ($method === $momo) {
+                    $local = PhoneHelper::toLocal((string) $value);
+
+                    if (! $local || ! preg_match('/^0(?:2\d|5\d)\d{7}$/', $local)) {
+                        $fail('Enter a valid 10-digit Ghana mobile money number.');
+                    }
+
+                    return;
+                }
+
+                if ($method === $bank
+                    && ! preg_match('/^\d{8,20}$/', (string) preg_replace('/\D/', '', (string) $value))) {
+                    $fail('Enter a valid bank account number.');
+                }
+            }],
+        ]);
+
+        return response()->json($this->payoutAccounts->update($request->user(), $validated));
     }
 }
