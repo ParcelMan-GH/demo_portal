@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\Vendor\Shipment;
 
 use App\Enums\ShipmentDestinationMode;
+use App\Http\Requests\Api\Vendor\Shipment\Concerns\NormalizesRequestedVehicles;
 use App\Models\Shipment;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,14 +12,13 @@ use Illuminate\Validation\Rule;
 
 class UpdateShipmentRequest extends FormRequest
 {
+    use NormalizesRequestedVehicles;
+
     protected function prepareForValidation(): void
     {
-        if (is_string($this->input('pickup_vehicles'))) {
-            $decoded = json_decode($this->input('pickup_vehicles'), true);
-            if (is_array($decoded)) {
-                $this->merge(['pickup_vehicles' => $decoded]);
-            }
-        }
+        // Accepts `requested_vehicles` or the legacy `pickup_vehicles`, a JSON
+        // string or an array, and rows keyed by `type` slug or `vehicle_type_id`.
+        $this->normalizeRequestedVehicles();
     }
 
     public function authorize(): bool
@@ -43,13 +43,21 @@ class UpdateShipmentRequest extends FormRequest
                 'pickup_town' => ['sometimes', 'nullable', 'string', 'max:255'],
                 'sender_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
                 'vendor_declared_quantity' => ['sometimes', 'nullable', 'integer', 'min:1'],
-                'pickup_vehicles' => ['sometimes', 'array'],
-                'pickup_vehicles.*.vehicle_type_id' => [
-                    'required_with:pickup_vehicles',
+                /*
+                 * `sometimes`, not `required`: a partial update — a photo-only
+                 * save, say — must not be forced to resend the vehicle list. But
+                 * when the key IS present it must carry at least one, so an
+                 * explicitly cleared selection cannot slip through.
+                 */
+                'requested_vehicles' => ['sometimes', 'array', 'min:1'],
+                'requested_vehicles.*.vehicle_type_id' => [
+                    'required',
                     'integer',
                     Rule::exists('pickup_vehicle_types', 'id')->where('is_active', true),
                 ],
-                'pickup_vehicles.*.quantity' => ['required_with:pickup_vehicles', 'integer', 'min:1', 'max:99'],
+                'requested_vehicles.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
+                // Legacy alias, normalised above; kept so it reaches the service.
+                'pickup_vehicles' => ['sometimes', 'array'],
                 'new_photos' => ['sometimes', 'array'],
                 'new_photos.*' => ['file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
                 'new_photos_phones' => ['nullable', 'array'],
@@ -91,13 +99,16 @@ class UpdateShipmentRequest extends FormRequest
 
             'sender_notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'vendor_declared_quantity' => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'pickup_vehicles' => ['sometimes', 'array'],
-            'pickup_vehicles.*.vehicle_type_id' => [
-                'required_with:pickup_vehicles',
+            // See the submitted branch above for why this is `sometimes`.
+            'requested_vehicles' => ['sometimes', 'array', 'min:1'],
+            'requested_vehicles.*.vehicle_type_id' => [
+                'required',
                 'integer',
                 Rule::exists('pickup_vehicle_types', 'id')->where('is_active', true),
             ],
-            'pickup_vehicles.*.quantity' => ['required_with:pickup_vehicles', 'integer', 'min:1', 'max:99'],
+            'requested_vehicles.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
+            // Legacy alias, normalised above; kept so it reaches the service.
+            'pickup_vehicles' => ['sometimes', 'array'],
         ];
     }
 
@@ -107,6 +118,7 @@ class UpdateShipmentRequest extends FormRequest
             'destination_mode.in' => 'Destination mode must be single or per_item.',
             'pickup_contact_phone_confirm.same' => 'Pickup phone numbers do not match.',
             'delivery_recipient_phone_confirm.same' => 'Delivery phone numbers do not match.',
+            'requested_vehicles.min' => 'Select at least one pickup vehicle.',
         ];
     }
 

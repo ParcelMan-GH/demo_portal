@@ -640,6 +640,13 @@ class ShipmentService
                     ? null
                     : $warehouseReceivedQuantity - $vendorDeclaredQuantity,
             ],
+            /*
+             * `requested_vehicles` is the standard key now. `pickup_vehicles` is
+             * emitted beside it rather than replaced: the mobile app ships through
+             * app-store builds, so versions already installed read the old name,
+             * and dropping it would blank the vehicle list in all of them.
+             */
+            'requested_vehicles' => $this->transformPickupVehicleRequests($shipment),
             'pickup_vehicles' => $this->transformPickupVehicleRequests($shipment),
             'pickup_vehicle_summary' => $this->pickupVehicleSummary($shipment),
             'rejected_at' => $shipment->rejected_at?->toIso8601String(),
@@ -739,6 +746,8 @@ class ShipmentService
             ->map(fn (ShipmentPickupVehicleRequest $request) => [
                 'id' => $request->id,
                 'vehicle_type_id' => $request->pickup_vehicle_type_id,
+                // The slug the documented payload uses, e.g. "motorbike".
+                'type' => $request->vehicleType?->slug,
                 'name' => $request->vehicleType?->name ?? $request->vehicle_name_snapshot,
                 'vehicle_name' => $request->vehicleType?->name ?? $request->vehicle_name_snapshot,
                 'vehicle_name_snapshot' => $request->vehicle_name_snapshot,

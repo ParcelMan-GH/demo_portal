@@ -1003,6 +1003,9 @@ class ReceiptController extends AdminShipmentController
             'pickup_longitude' => $shipment->pickup_longitude,
             'pickup_region' => $shipment->pickupRegion ? ['id' => $shipment->pickupRegion->id, 'name' => $shipment->pickupRegion->name] : null,
             'pickup_district' => $shipment->pickupDistrict ? ['id' => $shipment->pickupDistrict->id, 'name' => $shipment->pickupDistrict->name] : null,
+            // Both keys, for the same reason as the vendor API: hub builds already
+            // in the field read `pickup_vehicles`, newer ones read `requested_vehicles`.
+            'requested_vehicles' => $this->serializePickupVehicleRequests($shipment),
             'pickup_vehicles' => $this->serializePickupVehicleRequests($shipment),
             'pickup_vehicle_summary' => $this->pickupVehicleSummaryForReceipt($shipment),
             'delivery_recipient_name' => $shipment->delivery_recipient_name,
@@ -1027,6 +1030,8 @@ class ReceiptController extends AdminShipmentController
             ->map(fn ($request) => [
                 'id' => $request->id,
                 'vehicle_type_id' => $request->pickup_vehicle_type_id,
+                // Matches the vendor API row shape so both apps read the same.
+                'type' => $request->vehicleType?->slug,
                 'name' => $request->vehicleType?->name ?? $request->vehicle_name_snapshot,
                 'vehicle_name' => $request->vehicleType?->name ?? $request->vehicle_name_snapshot,
                 'vehicle_name_snapshot' => $request->vehicle_name_snapshot,

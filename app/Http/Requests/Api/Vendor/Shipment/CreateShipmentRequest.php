@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\Vendor\Shipment;
 
 use App\Enums\ShipmentDestinationMode;
+use App\Http\Requests\Api\Vendor\Shipment\Concerns\NormalizesRequestedVehicles;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -10,14 +11,13 @@ use Illuminate\Validation\Rule;
 
 class CreateShipmentRequest extends FormRequest
 {
+    use NormalizesRequestedVehicles;
+
     protected function prepareForValidation(): void
     {
-        if (is_string($this->input('pickup_vehicles'))) {
-            $decoded = json_decode($this->input('pickup_vehicles'), true);
-            if (is_array($decoded)) {
-                $this->merge(['pickup_vehicles' => $decoded]);
-            }
-        }
+        // Accepts `requested_vehicles` or the legacy `pickup_vehicles`, a JSON
+        // string or an array, and rows keyed by `type` slug or `vehicle_type_id`.
+        $this->normalizeRequestedVehicles();
     }
 
     public function authorize(): bool
@@ -66,13 +66,23 @@ class CreateShipmentRequest extends FormRequest
             // Sender notes
             'sender_notes' => ['nullable', 'string', 'max:2000'],
             'vendor_declared_quantity' => ['nullable', 'integer', 'min:1'],
-            'pickup_vehicles' => ['nullable', 'array'],
-            'pickup_vehicles.*.vehicle_type_id' => [
-                'required_with:pickup_vehicles',
+            /*
+             * At least one vehicle is required — a pickup with none on it cannot
+             * be dispatched. Enforced here as well as in the app so the rule holds
+             * for any client, not just the current build.
+             */
+            'requested_vehicles' => ['required', 'array', 'min:1'],
+            'requested_vehicles.*.vehicle_type_id' => [
+                'required',
                 'integer',
                 Rule::exists('pickup_vehicle_types', 'id')->where('is_active', true),
             ],
-            'pickup_vehicles.*.quantity' => ['required_with:pickup_vehicles', 'integer', 'min:1', 'max:99'],
+            'requested_vehicles.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
+
+            // Legacy alias. prepareForValidation() has already normalised it into
+            // the canonical key; this permissive rule exists so the value survives
+            // `validated()` and reaches ShipmentService, which reads this key.
+            'pickup_vehicles' => ['sometimes', 'array'],
 
             // Inline items — at least one item with at least one uploaded or reused image
             'items' => ['required', 'array', 'min:1'],
@@ -165,6 +175,8 @@ class CreateShipmentRequest extends FormRequest
             'items.min' => 'At least one item with images is required.',
             'items.*.images.*.max' => 'Each image must be under 2MB.',
             'items.*.images.*.mimes' => 'Images must be JPEG, PNG, or WebP.',
+            'requested_vehicles.required' => 'Select at least one pickup vehicle.',
+            'requested_vehicles.min' => 'Select at least one pickup vehicle.',
         ];
     }
 
