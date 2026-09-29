@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\ItemStatus;
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryRun;
 use App\Models\DeliveryRunItem;
@@ -240,10 +241,25 @@ class DriverPackageController extends Controller
             ->groupBy('shipment_item_id')
             ->pluck('active_quantity', 'shipment_item_id');
 
-        $deliveredQuantitiesByItemId = \App\Models\DeliveryRunItem::query()
+        /*
+         * What has already left the rider's hands.
+         *
+         * This counted only lines whose status was exactly `delivered`, and it
+         * summed `expected_quantity`. Both were wrong for the same reason:
+         * a partially delivered or handed-off line counted as *nothing*, so its
+         * packages looked untouched and came back to the staging list on the next
+         * trip. `delivered_quantity` is the number that actually left, so sum
+         * that, and treat partial and handed-off lines as deliveries too.
+         * The NULLIF fallback covers rows written before that column was filled.
+         */
+        $deliveredQuantitiesByItemId = DeliveryRunItem::query()
             ->whereIn('shipment_item_id', $shipmentItemIds)
-            ->where('status', \App\Models\DeliveryRunItem::STATUS_DELIVERED)
-            ->selectRaw('shipment_item_id, COALESCE(SUM(expected_quantity), 0) as delivered_quantity')
+            ->whereIn('status', [
+                DeliveryRunItem::STATUS_DELIVERED,
+                DeliveryRunItem::STATUS_PARTIAL,
+                DeliveryRunItem::STATUS_HANDED_OFF,
+            ])
+            ->selectRaw('shipment_item_id, COALESCE(SUM(COALESCE(NULLIF(delivered_quantity, 0), expected_quantity)), 0) as delivered_quantity')
             ->groupBy('shipment_item_id')
             ->pluck('delivered_quantity', 'shipment_item_id');
 
@@ -273,6 +289,25 @@ class DriverPackageController extends Controller
                     ->each(fn ($labelId) => $unavailableLabelIds->push($labelId));
             });
 
+
+        /*
+         * A parcel in a terminal state has left the rider for good, whatever the
+         * run lines add up to. The arithmetic above can only say *how many*
+         * labels of a parcel are gone, never *which* ones — so for a parcel the
+         * system already calls delivered, suppress all of its labels outright
+         * rather than trusting a count to land on the right ones.
+         */
+        $terminalItemIds = ShipmentItem::query()
+            ->whereIn('id', $shipmentItemIds)
+            ->whereIn('status', [ItemStatus::DELIVERED, ItemStatus::RETURNED])
+            ->pluck('id');
+
+        if ($terminalItemIds->isNotEmpty()) {
+            $labels
+                ->filter(fn ($label) => $terminalItemIds->contains((int) ($label->receiptItem?->shipment_item_id ?? 0)))
+                ->pluck('id')
+                ->each(fn ($labelId) => $unavailableLabelIds->push($labelId));
+        }
 
         $labelsById = $labels->keyBy('id');
 
@@ -615,6 +650,9 @@ class DriverPackageController extends Controller
             'description' => $item?->description,
             'tracking_code' => $item?->tracking_code,
             'delivery_method' => $deliveryMethod,
+            // The parcel's own status, so a client can drop anything the rider can
+            // no longer act on without having to infer it from the run lines.
+            'item_status' => $item?->status,
             'route_label' => $routeLabel,
             'recipient_name' => $recipientName,
             'recipient_phone' => $recipientPhone,
