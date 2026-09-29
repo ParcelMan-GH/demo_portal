@@ -312,6 +312,20 @@ class ShipmentItem extends Model
         return $this->belongsTo(District::class, 'delivery_district_id');
     }
 
+    /**
+     * Call logs an agent recorded against this parcel.
+     *
+     * Two rules hang off this relation rather than off the parcel's own columns:
+     * a parcel that already has one is hidden from the agent's Call Queue, and a
+     * second call cannot be logged for it. Both are questions about the logs, so
+     * `whereDoesntHave('agentCallLogs')` answers the first in a single query
+     * instead of a per-row lookup.
+     */
+    public function agentCallLogs(): HasMany
+    {
+        return $this->hasMany(AgentCallLog::class, 'shipment_item_id');
+    }
+
     public function outgoingBatch(): BelongsTo
     {
         return $this->belongsTo(OutgoingBatch::class);
@@ -432,5 +446,93 @@ class ShipmentItem extends Model
             'gh_post_address' => $this->delivery_gh_post_address,
             'landmark' => $this->delivery_landmark,
         ];
+    }
+
+    /**
+     * A short, readable name for where this parcel will be *received* — the
+     * counterpart to the warehouse named in the "received at" part of a message.
+     *
+     * The address can arrive in one of three shapes — a region/district chosen
+     * from dropdowns, a dropped map pin, or a Ghana Post GPS code — and any shape
+     * can be missing while a free-text town or landmark sits beside it.
+     * `delivery_location_type` says which shape was used, so this reads the
+     * matching fields and degrades to whatever text actually exists. It never
+     * returns an empty string or the word "null": callers append it to customer
+     * messages, where a blank is worse than a vaguer label. Kept deliberately
+     * short — it is read down a phone line and shown on one line.
+     *
+     * Reusable on purpose: the SMS listener is the first caller, but any screen
+     * that needs to say where a parcel is going can use the same string.
+     */
+    public function deliveryLocationLabel(): string
+    {
+        $town = trim((string) $this->delivery_town);
+        $landmark = trim((string) $this->delivery_landmark);
+        $ghPost = trim((string) $this->delivery_gh_post_address);
+        $region = trim((string) $this->deliveryRegion?->name);
+        $district = trim((string) $this->deliveryDistrict?->name);
+
+        $label = match ($this->delivery_location_type) {
+            // Region/district chosen from the dropdowns: town is the most
+            // specific thing the customer recognises, then district, then region.
+            'dropdown' => $this->joinLocationParts([$town, $district, $region]),
+
+            // A dropped pin. Its coordinates are not something a customer reads,
+            // so a town or landmark beats them; the numbers are the last resort
+            // for a pin-only address.
+            'coordinates' => $this->joinLocationParts([$town, $landmark]) ?: $this->coordinateLabel(),
+
+            // Ghana Post GPS code — the postcode locals actually use.
+            'gh_post' => $this->joinLocationParts([$ghPost, $town]),
+
+            // Nothing matched the named shapes, so fall back across every text
+            // field before giving up on a generic phrase.
+            default => $this->joinLocationParts([$town, $landmark, $ghPost, $district, $region]),
+        };
+
+        return $label !== '' ? $label : 'the delivery address on file';
+    }
+
+    /**
+     * Join the non-empty parts of an address into one label, dropping blanks and
+     * repeats so "Accra, Accra" or a dangling separator never reaches a customer.
+     *
+     * @param  array<int, string|null>  $parts
+     */
+    protected function joinLocationParts(array $parts): string
+    {
+        $unique = [];
+
+        foreach ($parts as $part) {
+            $part = trim((string) $part);
+
+            if ($part === '') {
+                continue;
+            }
+
+            // Case-insensitive de-duplication: regions and districts are often
+            // named after their town ("Kumasi, Kumasi Metropolitan", "Accra").
+            $key = mb_strtolower($part);
+
+            if (isset($unique[$key])) {
+                continue;
+            }
+
+            $unique[$key] = $part;
+        }
+
+        return implode(', ', array_values($unique));
+    }
+
+    /**
+     * A last-resort label for a pin-only address: the numbers a rider can follow.
+     */
+    protected function coordinateLabel(): string
+    {
+        if (! filled($this->delivery_latitude) || ! filled($this->delivery_longitude)) {
+            return '';
+        }
+
+        return 'GPS '.number_format((float) $this->delivery_latitude, 5).', '.number_format((float) $this->delivery_longitude, 5);
     }
 }

@@ -10,6 +10,7 @@ use App\Models\OutgoingBatchAssignmentEvent;
 use App\Models\ShipmentItem;
 use App\Services\OutgoingBatchAutoAssignmentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AgentParcelController extends Controller
 {
@@ -66,8 +67,28 @@ class AgentParcelController extends Controller
     {
         $agent = $request->user();
 
+        /*
+         * The Call Queue holds the agent's claimed parcels that are still
+         * *waiting* for a call — and only those.
+         *
+         * `status = picked_up` on its own kept every parcelled call in the queue
+         * forever: a call outcome other than "confirmed" changes no status, so
+         * once an agent logged a call the parcel still matched and could never
+         * leave the list. "Still to call" and "currently picked up" are two
+         * different questions, so the filter is now two conditions — still
+         * picked up, *and* no call log recorded.
+         *
+         * The exclusion is deliberately a query, not a new status. The brief only
+         * names a target status for a confirmed call (`pending`); inventing one
+         * for rescheduled / unreachable / cancelled would either overload
+         * `pending` or add a state nothing else in the system understands, and
+         * the queue would still have to look up the logs to decide. Asking the
+         * logs directly travels with the data. `whereDoesntHave` compiles to a
+         * single NOT EXISTS, so this stays one query — no N+1.
+         */
         $parcels = ShipmentItem::where('agent_id', $agent->id)
             ->where('status', ItemStatus::PICKED_UP)
+            ->whereDoesntHave('agentCallLogs')
             ->latest()
             ->get();
 
@@ -135,7 +156,11 @@ class AgentParcelController extends Controller
      *
      * A "confirmed" outcome (the spec's "Confirmed Payment") is the trigger for
      * auto-batching: the parcel joins the open outgoing batch for its
-     * destination, or gets a brand new batch when none is open yet.
+     * destination, or gets a brand new batch when none is open yet. It also
+     * returns the parcel to `pending` so it leaves the call queue.
+     *
+     * A parcel can only ever carry one call log: a second attempt is refused with
+     * a 409 (see below), and the queue is filtered on the same fact.
      */
     public function logCall(Request $request, OutgoingBatchAutoAssignmentService $autoBatching)
     {
@@ -179,51 +204,144 @@ class AgentParcelController extends Controller
             ], 403);
         }
 
-        if (! $parcel->agent_id) {
-            $parcel->update([
+        /*
+         * Everything that has to agree with itself runs in one transaction, and
+         * it begins by locking the parcel's row.
+         *
+         * The lock is what makes "one call per parcel" hold when two taps race:
+         * the second request blocks here until the first commits, then sees the
+         * log the first wrote and is refused below. A plain existence check with
+         * no lock lets both requests read "no call yet" and both insert.
+         *
+         * In the same transaction a confirmed outcome also moves the parcel from
+         * `picked_up` to `pending`, before the auto-batching claims it for its
+         * destination. Atomic on purpose: if batching throws, the status change
+         * must not survive on its own. (Batching opens its own transaction; under
+         * a surrounding one it becomes a savepoint, so it still shares our fate.)
+         */
+        $result = DB::transaction(function () use ($request, $agent, $parcel, $outcome, $autoBatching) {
+            $locked = ShipmentItem::query()
+                ->whereKey($parcel->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (! $locked) {
+                return ['state' => 'missing'];
+            }
+
+            /*
+             * One logged call per parcel. Read *under the lock* so a concurrent
+             * insert cannot slip past it: the racer is either before us (we see
+             * its log) or behind us (it waits for our lock and then sees ours).
+             */
+            $existingLog = AgentCallLog::query()
+                ->where('shipment_item_id', $locked->getKey())
+                ->latest('id')
+                ->first();
+
+            if ($existingLog) {
+                return ['state' => 'duplicate', 'existing' => $existingLog];
+            }
+
+            if (! $locked->agent_id) {
+                $locked->update([
+                    'agent_id' => $agent->id,
+                    'claimed_at' => $locked->claimed_at ?? now(),
+                ]);
+            }
+
+            $proofPath = $request->hasFile('payment_proof')
+                ? $request->file('payment_proof')->store('agent-call-proofs/'.$locked->id, 'public')
+                : null;
+
+            $log = AgentCallLog::create([
+                'shipment_item_id' => $locked->id,
                 'agent_id' => $agent->id,
-                'claimed_at' => $parcel->claimed_at ?? now(),
+                'outcome' => $outcome,
+                'notes' => $request->input('notes'),
+                'amount_paid' => $this->parseAmount($request->input('amount_paid')),
+                'payment_proof_path' => $proofPath,
+                'rescheduled_for' => $request->input('rescheduled_date'),
             ]);
+
+            $batching = null;
+
+            if ($outcome === AgentCallLog::OUTCOME_CONFIRMED) {
+                /*
+                 * Confirmed payment returns the parcel to `pending` for handling
+                 * (the brief's target status). Auto-batching runs straight after
+                 * and may advance it again to `ready_for_hub_transfer` when it
+                 * finds a destination — which is why the response reports the
+                 * status we *end* on, not the one set here.
+                 */
+                $locked->update(['status' => ItemStatus::PENDING]);
+
+                $assignment = $autoBatching->assignForDestination(
+                    $locked->fresh(),
+                    OutgoingBatchAssignmentEvent::SOURCE_AGENT_CALL,
+                    (int) $agent->id
+                );
+
+                $batching = [
+                    'result' => $assignment['result'],
+                    'batch_id' => $assignment['batch']?->id,
+                    'batch_number' => $assignment['batch']?->batch_number,
+                    'batch_created' => $assignment['created'],
+                    'message' => $assignment['message'],
+                ];
+            }
+
+            // Re-read once so `new_status` is what the app should show, including
+            // whatever the batching just changed it to.
+            $locked->refresh();
+
+            return [
+                'state' => 'logged',
+                'log' => $log,
+                'batching' => $batching,
+                'new_status' => $locked->status instanceof ItemStatus
+                    ? $locked->status->value
+                    : (string) $locked->status,
+            ];
+        });
+
+        if ($result['state'] === 'missing') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parcel not found in system.',
+            ], 404);
         }
 
-        $proofPath = $request->hasFile('payment_proof')
-            ? $request->file('payment_proof')->store('agent-call-proofs/'.$parcel->id, 'public')
-            : null;
+        if ($result['state'] === 'duplicate') {
+            $existing = $result['existing'];
 
-        $log = AgentCallLog::create([
-            'shipment_item_id' => $parcel->id,
-            'agent_id' => $agent->id,
-            'outcome' => $outcome,
-            'notes' => $request->input('notes'),
-            'amount_paid' => $this->parseAmount($request->input('amount_paid')),
-            'payment_proof_path' => $proofPath,
-            'rescheduled_for' => $request->input('rescheduled_date'),
-        ]);
-
-        $batching = null;
-
-        if ($outcome === AgentCallLog::OUTCOME_CONFIRMED) {
-            $assignment = $autoBatching->assignForDestination(
-                $parcel->fresh(),
-                OutgoingBatchAssignmentEvent::SOURCE_AGENT_CALL,
-                (int) $agent->id
-            );
-
-            $batching = [
-                'result' => $assignment['result'],
-                'batch_id' => $assignment['batch']?->id,
-                'batch_number' => $assignment['batch']?->batch_number,
-                'batch_created' => $assignment['created'],
-                'message' => $assignment['message'],
-            ];
+            /*
+             * 409 Conflict rather than 422: the request is well formed and the
+             * data is valid — it simply collides with a call that already exists
+             * for this parcel. The existing outcome and time are returned so the
+             * app can explain *why* the Call button is now unavailable instead of
+             * just failing.
+             */
+            return response()->json([
+                'success' => false,
+                'message' => 'A call has already been logged for this parcel.',
+                'data' => [
+                    'existing_call_log' => [
+                        'id' => $existing->getKey(),
+                        'outcome' => $existing->outcome,
+                        'created_at' => optional($existing->created_at)->toIso8601String(),
+                    ],
+                ],
+            ], 409);
         }
 
         return response()->json([
             'success' => true,
-            'message' => $this->outcomeMessage($outcome, $batching),
+            'message' => $this->outcomeMessage($outcome, $result['batching']),
             'data' => [
-                'call_log' => $log,
-                'batching' => $batching,
+                'call_log' => $result['log'],
+                'batching' => $result['batching'],
+                'new_status' => $result['new_status'],
             ],
         ]);
     }

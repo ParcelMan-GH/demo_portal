@@ -5,9 +5,19 @@ namespace App\Listeners;
 use App\Events\WalkinShipmentReceived;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class SendWalkinSmsNotification
 {
+    /**
+     * How many characters of the delivery location we will put in an SMS.
+     *
+     * A full address ("Ablekuma North Municipal, Greater Accra Region, ...") can
+     * run long and would push the message into two segments. The recipient only
+     * needs enough to recognise the destination, so the label is trimmed here.
+     */
+    private const MAX_LOCATION_LENGTH = 60;
+
     /**
      * Handle the event when a walk-in shipment is received.
      */
@@ -15,6 +25,10 @@ class SendWalkinSmsNotification
     {
         $shipment = $event->shipment;
         $warehouseName = $event->warehouse->name;
+
+        // The location label reads the region and district names, so load them
+        // with the items rather than letting each item fetch its own in the loop.
+        $shipment->loadMissing(['items.deliveryRegion', 'items.deliveryDistrict']);
 
         // Loop through each package inside the shipment
         foreach ($shipment->items as $item) {
@@ -33,7 +47,15 @@ class SendWalkinSmsNotification
                 continue;
             }
 
-            $message = "Hello {$name}, your package ({$item->description}) tracking number is {$trackingCode}. Received at {$warehouseName}.";
+            /*
+             * The old message named only where the parcel was *received* (the
+             * warehouse) and never where the customer will receive it. The
+             * opening sentence is kept so the customer still recognises it, and
+             * the delivery location is appended from the parcel's own fields.
+             */
+            $location = Str::limit($item->deliveryLocationLabel(), self::MAX_LOCATION_LENGTH, '...');
+
+            $message = "Hello {$name}, your package ({$item->description}) tracking number is {$trackingCode}. Received at {$warehouseName}. Deliver to: {$location}.";
 
             try {
                 $response = Http::withHeaders([

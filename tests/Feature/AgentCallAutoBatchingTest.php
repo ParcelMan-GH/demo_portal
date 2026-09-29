@@ -91,7 +91,9 @@ it('creates an outgoing batch for the destination when payment is confirmed', fu
     ])
         ->assertOk()
         ->assertJsonPath('success', true)
-        ->assertJsonPath('data.batching.result', 'batch_created');
+        ->assertJsonPath('data.batching.result', 'batch_created')
+        // Batching moved it on from pending to ready for hub transfer.
+        ->assertJsonPath('data.new_status', ItemStatus::READY_FOR_HUB_TRANSFER->value);
 
     $parcel->refresh();
 
@@ -135,7 +137,7 @@ it('adds a second parcel for the same destination to the batch already open', fu
     expect(OutgoingBatchAssignmentEvent::where('event_type', OutgoingBatchAssignmentEvent::EVENT_BATCH_ATTACHED)->count())->toBe(1);
 });
 
-it('does not double-assign when the same confirmation is logged twice', function () {
+it('refuses a second call for the same parcel and only batches once', function () {
     $region = acbRegion('WR');
     $district = acbDistrict($region, 'TAK');
     $agent = acbAgent();
@@ -148,16 +150,44 @@ it('does not double-assign when the same confirmation is logged twice', function
     $batchId = $parcel->fresh()->outgoing_batch_id;
     expect($batchId)->not->toBeNull();
 
+    // A second call is refused outright (409), and the refusal names the log
+    // that already exists so the app can explain why.
     $this->postJson('/api/v1/agent/calls/log', ['parcel_id' => $parcel->id, 'outcome' => 'confirmed'])
-        ->assertOk()
-        ->assertJsonPath('data.batching.result', 'already_batched');
+        ->assertStatus(409)
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('data.existing_call_log.outcome', AgentCallLog::OUTCOME_CONFIRMED);
 
     expect(OutgoingBatch::count())->toBe(1);
     expect($parcel->fresh()->outgoing_batch_id)->toBe($batchId);
 
-    // The call itself is logged both times; the assignment only happens once.
-    expect(AgentCallLog::count())->toBe(2);
+    // Only the first call was recorded; nothing was batched twice.
+    expect(AgentCallLog::count())->toBe(1);
     expect(OutgoingBatchAssignmentEvent::count())->toBe(1);
+});
+
+it('removes a called parcel from the agent call queue', function () {
+    $region = acbRegion('GA');
+    $district = acbDistrict($region, 'ACC');
+    $agent = acbAgent();
+    $parcel = acbParcel($region, $district);
+
+    Sanctum::actingAs($agent);
+
+    $this->postJson('/api/v1/agent/parcels/scan-claim', ['tracking_code' => $parcel->tracking_code])->assertOk();
+
+    $this->getJson('/api/v1/agent/parcels/queue')
+        ->assertOk()
+        ->assertJsonCount(1, 'data');
+
+    // A non-confirmed outcome leaves the status untouched, so only the call-log
+    // exclusion can take the parcel out of the queue.
+    $this->postJson('/api/v1/agent/calls/log', ['parcel_id' => $parcel->id, 'outcome' => 'unreachable'])->assertOk();
+
+    expect($parcel->fresh()->status)->toBe(ItemStatus::PICKED_UP);
+
+    $this->getJson('/api/v1/agent/parcels/queue')
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
 });
 
 it('logs the call but skips batching when the parcel has no destination', function () {
@@ -168,9 +198,12 @@ it('logs the call but skips batching when the parcel has no destination', functi
 
     $this->postJson('/api/v1/agent/calls/log', ['parcel_id' => $parcel->id, 'outcome' => 'confirmed'])
         ->assertOk()
-        ->assertJsonPath('data.batching.result', 'missing_destination');
+        ->assertJsonPath('data.batching.result', 'missing_destination')
+        // Nothing advanced it past pending, so it stays pending — out of the queue.
+        ->assertJsonPath('data.new_status', ItemStatus::PENDING->value);
 
     expect($parcel->fresh()->outgoing_batch_id)->toBeNull();
+    expect($parcel->fresh()->status)->toBe(ItemStatus::PENDING);
     expect(OutgoingBatch::count())->toBe(0);
     expect(AgentCallLog::count())->toBe(1);
 });
@@ -203,7 +236,9 @@ it('records the outcome without batching when the call is not a confirmation', f
         'outcome' => 'rescheduled',
     ])
         ->assertOk()
-        ->assertJsonPath('data.batching', null);
+        ->assertJsonPath('data.batching', null)
+        // A non-confirmed outcome changes no status; it just leaves the queue.
+        ->assertJsonPath('data.new_status', ItemStatus::PICKED_UP->value);
 
     expect(AgentCallLog::firstOrFail()->outcome)->toBe(AgentCallLog::OUTCOME_RESCHEDULED);
     expect($parcel->fresh()->outgoing_batch_id)->toBeNull();
