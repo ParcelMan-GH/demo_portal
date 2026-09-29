@@ -783,8 +783,10 @@ $itemStatusColors = [
                     </div>
 
                     <div class="min-w-0">
-                        <p class="text-[11px] font-black uppercase tracking-[0.22em] text-[#D95A11]">Delivery Run Workspace</p>
-                        <h1 class="mt-2 max-w-4xl break-words text-3xl font-black leading-tight tracking-tight text-slate-900 sm:text-5xl xl:text-4xl 2xl:text-5xl">{{ $run->run_number }}</h1>
+                        {{-- The run number already says what this page is; an
+                             uppercase "Delivery Run Workspace" kicker above it was
+                             pure filler. --}}
+                        <h1 class="max-w-4xl break-words text-3xl font-black leading-tight tracking-tight text-slate-900 sm:text-4xl">{{ $run->run_number }}</h1>
                         <div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-semibold text-slate-500 sm:text-base">
                             @unless($hideRunWarehouseMeta)
                                 <span>{{ $run->warehouse?->name ?? 'No warehouse' }}</span>
@@ -823,42 +825,60 @@ $itemStatusColors = [
                 </div>
                 </div>
 
-                {{-- Borderless, beige-tinted counters: the number carries the brand colour, the label stays quiet. --}}
-                <div class="grid grid-cols-2 gap-2 sm:gap-3 lg:ml-auto lg:w-[430px] lg:shrink-0 2xl:w-[480px]">
-                    <div class="rounded-2xl bg-[#FAF6F0] p-3 sm:p-4">
-                        <p class="text-2xl font-black leading-tight text-[#D95A11]">{{ number_format($totalStops) }} stops</p>
-                        <p class="mt-2 text-sm font-semibold leading-snug text-slate-500">{{ number_format($deliveredStops) }} delivered / {{ number_format($pendingStops) }} pending</p>
-                    </div>
-                    <div class="rounded-2xl bg-[#FAF6F0] p-3 sm:p-4">
-                        <p class="text-2xl font-black leading-tight text-[#D95A11]">{{ number_format($totalItems) }} packages</p>
-                        <p class="mt-2 text-sm font-semibold leading-snug text-slate-500">{{ number_format($deliveredItems) }} delivered packages</p>
-                    </div>
+                {{--
+                    Compact metric pills, not two wide counter cards. The cards had
+                    to be 430px wide to stop their own text wrapping, which pushed
+                    the header into two competing halves; a badge says the same
+                    thing in one line and leaves the run number as the loudest
+                    thing on the page.
+                --}}
+                <div class="flex flex-wrap items-center gap-2 lg:ml-auto lg:max-w-[420px] lg:justify-end lg:shrink-0">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-[#FAF6F0] px-3 py-1.5 text-xs font-black text-[#D95A11]">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657 13.414 20.9a2 2 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0Z"/>
+                            <circle cx="12" cy="11" r="2.5" stroke-width="2"/>
+                        </svg>
+                        {{ number_format($totalStops) }} {{ \Illuminate\Support\Str::plural('Stop', $totalStops) }}
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-[#FAF6F0] px-3 py-1.5 text-xs font-black text-[#D95A11]">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/>
+                        </svg>
+                        {{ number_format($totalItems) }} {{ \Illuminate\Support\Str::plural('Package', $totalItems) }}
+                    </span>
+                    <span class="text-xs font-semibold text-slate-500">
+                        {{ number_format($deliveredStops) }} of {{ number_format($totalStops) }} stops delivered
+                        <span class="text-slate-300">·</span>
+                        {{ number_format($pendingStops) }} pending
+                    </span>
                 </div>
             </div>
         </div>
     </section>
 
     @if($latestTimelineEvent)
-    <section x-data="{ timelineOpen: false }" class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    {{--
+        One quiet line rather than a banner. The latest event already says enough
+        at a glance, and the count chip expands the rest on demand, so the run's
+        own stops keep the page's attention.
+    --}}
+    <section x-data="{ timelineOpen: false }" class="overflow-hidden rounded-2xl border border-slate-200/70 bg-white">
         <button
             type="button"
             @@click="timelineOpen = !timelineOpen"
-            class="flex w-full items-center justify-between gap-3 px-4 py-4 text-left transition hover:bg-slate-50 sm:px-5"
+            class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-slate-50 sm:px-5"
         >
-            <div class="min-w-0">
-                <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Delivery Timeline</p>
-                <div class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
-                    <span class="text-sm font-black text-slate-950">{{ $latestTimelineEvent['label'] }}</span>
-                    <span class="text-slate-500">/</span>
-                    <span class="text-xs font-bold text-slate-500">{{ $latestTimelineEvent['at_label'] }}</span>
-                    @if($latestTimelineEvent['actor'] ?? null)
-                        <span class="text-slate-500">/</span>
-                        <span class="truncate text-xs font-bold text-slate-500">by {{ $latestTimelineEvent['actor'] }}</span>
-                    @endif
-                </div>
+            <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                <span class="font-black text-slate-800">{{ $latestTimelineEvent['label'] }}</span>
+                <span class="text-slate-300">/</span>
+                <span class="font-semibold text-slate-500">{{ $latestTimelineEvent['at_label'] }}</span>
+                @if($latestTimelineEvent['actor'] ?? null)
+                    <span class="text-slate-300">/</span>
+                    <span class="truncate font-semibold text-slate-500">by {{ $latestTimelineEvent['actor'] }}</span>
+                @endif
             </div>
             <div class="flex shrink-0 items-center gap-2">
-                <span class="hidden rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600 sm:inline">{{ $deliveryTimelineEvents->count() }} events</span>
+                <span class="rounded-full bg-[#FAF6F0] px-2.5 py-1 text-[10px] font-black text-[#B84C0B]">{{ $deliveryTimelineEvents->count() }} events</span>
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500">
                     <svg class="h-4 w-4 transition-transform" :class="timelineOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"/>
@@ -1319,8 +1339,10 @@ $itemStatusColors = [
                         </div>
                     </div>
 
-                    {{-- One borderless strip: the four facts about this stop, no nested boxes. --}}
-                    <div class="grid gap-x-6 gap-y-4 px-4 py-5 sm:grid-cols-2 xl:grid-cols-4 sm:px-5">
+                    {{-- One borderless 2x2 strip. At four-across the cells spread out
+                         and each one held a single short value, so the row read as
+                         empty space with text stranded in it. --}}
+                    <div class="grid gap-x-6 gap-y-5 px-4 py-5 sm:grid-cols-2 sm:px-5">
                         <div>
                             <p class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-400"><svg class="h-3.5 w-3.5 shrink-0 text-[#D95A11]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21s-7-5.686-7-11a7 7 0 1 1 14 0c0 5.314-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5" stroke-width="2"/></svg>Planned Location</p>
                             <p class="mt-1.5 text-sm font-semibold text-slate-800">{{ $locationParts ?: '—' }}</p>
@@ -1373,7 +1395,10 @@ $itemStatusColors = [
                                     View proof photo
                                 </a>
                             @else
-                                <p class="mt-1.5 text-sm font-semibold text-slate-800">No proof photo</p>
+                                {{-- No empty-state sentence: a stop that has not
+                                     happened yet has no photo, which is expected
+                                     rather than worth a line of prose. --}}
+                                <p class="mt-1.5 text-sm font-semibold text-slate-300">—</p>
                             @endif
                         </div>
 
@@ -1497,9 +1522,16 @@ $itemStatusColors = [
                                             <p class="truncate text-xs font-semibold text-slate-700">{{ $item->delivered_quantity ?? 0 }}/{{ $item->expected_quantity }}</p>
                                         </div>
                                         <div class="col-span-12 sm:col-span-1 min-w-0">
-                                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold {{ $itemBadgeClass }}">
-                                                {{ $itemStatusLabel }}
-                                            </span>
+                                            @if($itemStatusLabel === $stopStatusLabel)
+                                                {{-- The stop badge in the header above already
+                                                     carries this exact status; a second identical
+                                                     pill in the row is pure repetition. --}}
+                                                <span class="text-xs font-semibold text-slate-300">—</span>
+                                            @else
+                                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold {{ $itemBadgeClass }}">
+                                                    {{ $itemStatusLabel }}
+                                                </span>
+                                            @endif
                                         </div>
                                         <div class="col-span-12 sm:col-span-2 min-w-0">
                                             <span class="inline-flex max-w-full items-center rounded-full px-2.5 py-1 text-[10px] font-black ring-1 {{ $delayToneClasses }}">
@@ -1605,18 +1637,17 @@ $itemStatusColors = [
                                 ->value('code');
                         @endphp
                         @if($otpCode)
-                        <div class="mx-4 mb-4 overflow-hidden rounded-2xl border border-[#D95A11]/20 bg-[#FAF6F0] sm:mx-5">
-                            <div class="flex items-center justify-between gap-3 border-b border-[#D95A11]/15 px-4 py-2.5">
+                        <div class="flex justify-end px-4 pb-4 sm:px-5">
+                            <div class="inline-flex max-w-full flex-wrap items-center gap-x-4 gap-y-1.5 rounded-2xl border border-[#D95A11]/15 bg-[#FFF8F5] px-4 py-3">
                                 <span class="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#B84C0B]">
                                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                                     Delivery PIN
                                 </span>
-                                <span class="text-[10px] font-semibold text-slate-500">Sent {{ $stop->verification_code_sent_at->diffForHumans() }}</span>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
                                 <span class="font-mono text-3xl font-black leading-none tracking-[0.3em] text-[#D95A11] tabular-nums">{{ $otpCode }}</span>
-                                <span class="text-[11px] font-semibold text-slate-600">
-                                    {{ ($stop->recipient_name ?: 'The recipient') . ' reads this to the rider to close the stop.' }}
+                                <span class="text-[11px] font-semibold text-slate-500">
+                                    {{ ($stop->recipient_name ?: 'The recipient') . ' reads this to the rider' }}
+                                    <span class="text-slate-300">·</span>
+                                    sent {{ $stop->verification_code_sent_at->diffForHumans() }}
                                 </span>
                             </div>
                         </div>
