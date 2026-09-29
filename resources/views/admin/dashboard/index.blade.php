@@ -15,15 +15,23 @@
         margin-top: -30px;
     }
     .marker-label {
-        background: white;
-        padding: 2px 10px;
+        background: #FFFFFF;
+        padding: 3px 10px;
+        border: 1px solid #E2E8F0;
         border-radius: 9999px;
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 600;
-        color: #334155;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        line-height: 1.2;
+        color: #1E293B;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.16);
         margin-bottom: 4px;
         white-space: nowrap;
+        /* The icon box is 40px wide and a rider's name is wider than that: let the
+           label take its own width and overflow visibly instead of being squeezed
+           into the box, which is what made the names hard to read. */
+        width: max-content;
+        max-width: 160px;
+        overflow: visible;
     }
     .marker-pin {
         width: 18px;
@@ -141,7 +149,7 @@
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
         {{-- Left: Live Tracking Map --}}
-        <div class="xl:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+        <div class="xl:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
             <div class="px-6 py-4 flex items-center justify-between gap-4 border-b border-slate-100">
                 <div class="flex items-baseline gap-3 min-w-0">
                     <h2 class="text-sm font-medium text-slate-700 flex-shrink-0">Live Tracking</h2>
@@ -166,14 +174,68 @@
                 read as clutter. The list and the detail share one column now, and
                 the map keeps the rest.
             --}}
-            <div class="flex-1 flex flex-col lg:flex-row" style="height: 560px;">
+            {{--
+                Geometry in plain CSS, on purpose.
+
+                This page's stylesheet is a Vite build, and Tailwind only emits a
+                utility if the build saw it in the source. `lg:flex-1` on the map and
+                `lg:w-80` on the riders column are not in the built file, so the map
+                had no width to grow into and collapsed to nothing while the column
+                stayed full width — a list of riders with no map behind it, which is
+                exactly what the dashboard was showing. Nothing here depends on a
+                build step.
+            --}}
+            <style>
+                #live-tracking-body { height: 560px; }
+                #live-tracking-map {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    min-height: 300px;
+                    position: relative;
+                    overflow: hidden;
+                }
+                #map-container { position: absolute; inset: 0; }
+                #live-tracking-empty {
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 500;
+                }
+                #live-tracking-riders {
+                    flex: 0 0 auto;
+                    width: 100%;
+                    max-height: 260px;
+                    min-height: 0;
+                    display: flex;
+                    flex-direction: column;
+                    border-top: 1px solid #F1F5F9;
+                }
+                #live-tracking-list { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+                #live-tracking-scroll,
+                #live-tracking-detail { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+                @media (min-width: 1024px) {
+                    #live-tracking-body { flex-direction: row; }
+                    #live-tracking-riders {
+                        width: 20rem;
+                        max-height: 100%;
+                        border-top: 0;
+                        border-left: 1px solid #F1F5F9;
+                    }
+                }
+            </style>
+
+            <div id="live-tracking-body" class="flex flex-col">
 
             {{-- Map Area --}}
-            <div class="relative flex-1 bg-slate-100 overflow-hidden" id="map-container" wire:ignore>
+            <div id="live-tracking-map" class="bg-slate-100">
+                <div id="map-container" wire:ignore></div>
 
                {{-- Empty state: nobody is out --}}
-               <div x-show="riders.length === 0"
-                    class="absolute inset-0 flex flex-col items-center justify-center text-center bg-slate-50 z-[500]">
+               <div x-show="riders.length === 0" id="live-tracking-empty" class="bg-slate-50 text-center">
                    <div class="w-14 h-14 rounded-full bg-slate-200 flex items-center justify-center mb-3">
                        <svg class="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                    </div>
@@ -191,15 +253,16 @@
                 unknown rather than dropped — "on a run, no fix yet" is not the
                 same thing as "nobody is working".
             --}}
-            <aside class="w-full lg:w-80 flex-shrink-0 border-t lg:border-t-0 lg:border-l border-slate-100 bg-white flex flex-col min-h-0">
+            {{-- Capped while stacked, so it can never crowd the map out of the row. --}}
+            <aside id="live-tracking-riders" class="bg-white">
 
-                <div x-show="!selectedRider" class="flex flex-col flex-1 min-h-0">
+                <div x-show="!selectedRider" id="live-tracking-list">
                     <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
                         <span class="text-xs font-semibold text-slate-600">On the road</span>
                         <span class="text-[11px] text-slate-400" x-text="`${riders.filter(r => r.has_position).length} located`"></span>
                     </div>
 
-                    <div class="flex-1 overflow-y-auto min-h-0">
+                    <div id="live-tracking-scroll">
                         <template x-for="rider in visibleRiders" :key="rider.id">
                             <button type="button" @click="selectRider(rider.id)"
                                     class="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
@@ -223,11 +286,11 @@
                 </div>
 
                {{-- Whoever is picked --}}
-               <div x-show="selectedRider" style="display: none;"
+               <div x-show="selectedRider" style="display: none;" id="live-tracking-detail"
                     x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0 translate-x-4"
                     x-transition:enter-end="opacity-100 translate-x-0"
-                    class="flex-1 min-h-0 overflow-y-auto p-6">
+                    class="p-6">
 
                    <div class="flex justify-end">
                        <button type="button" @click="selectedRider = null"
@@ -376,6 +439,8 @@
             riders: @json($activeRiders),
             search: "",
             markers: {},
+            routeLayers: {},
+            framed: false,
             map: null,
 
             /**
@@ -491,6 +556,90 @@
 
                     this.map.removeLayer(this.markers[id]);
                     delete this.markers[id];
+                });
+
+                /*
+                 * Frame everyone we can place, once.
+                 *
+                 * The map opens on a fixed city view, so a rider carrying a batch
+                 * between hubs is tracked but never actually on screen — the first
+                 * screenshot of this panel showed one pin and two riders the admin
+                 * could not see at all. Framed once rather than on every poll,
+                 * because re-fitting would yank the view back while the admin is
+                 * looking at something.
+                 */
+                if (!this.framed && placed.length > 0) {
+                    this.framed = true;
+
+                    // Include each located transporter's leg, so framing shows the
+                    // journey rather than only where everyone happens to be.
+                    const points = placed.map(r => [r.lat, r.lng]);
+                    placed.forEach(r => {
+                        if (!r.route) return;
+                        points.push([r.route.origin.lat, r.route.origin.lng]);
+                        points.push([r.route.destination.lat, r.route.destination.lng]);
+                    });
+
+                    try {
+                        this.map.fitBounds(points, {
+                            padding: [48, 48],
+                            maxZoom: 12,
+                        });
+                    } catch (e) {
+                        // A single fix or a degenerate box: keep the default view.
+                    }
+                }
+
+                this.syncRoutes();
+            },
+
+            /**
+             * The leg a transporter is on, drawn.
+             *
+             * The payload has carried each transporter's origin and destination
+             * since the panel learned about transport at all, and nothing drew it —
+             * the map showed a dot with no indication of where it was going. Drawn
+             * dashed, because it is the planned leg and not the road taken.
+             */
+            syncRoutes() {
+                const wanted = {};
+
+                this.riders.forEach(rider => {
+                    if (rider.route && rider.route.origin && rider.route.destination) {
+                        wanted[rider.id] = rider.route;
+                    }
+                });
+
+                Object.keys(wanted).forEach(id => {
+                    if (this.routeLayers[id]) return;
+
+                    const route = wanted[id];
+
+                    const line = L.polyline(
+                        [
+                            [route.origin.lat, route.origin.lng],
+                            [route.destination.lat, route.destination.lng],
+                        ],
+                        { color: '#EA580C', weight: 3, opacity: 0.6, dashArray: '6 6' },
+                    );
+
+                    const head = L.circleMarker(
+                        [route.destination.lat, route.destination.lng],
+                        { radius: 6, color: '#B91C1C', weight: 2, fillColor: '#FFFFFF', fillOpacity: 1 },
+                    );
+
+                    if (route.destination.name) {
+                        head.bindTooltip(route.destination.name + ' — destination hub', { direction: 'top' });
+                    }
+
+                    this.routeLayers[id] = L.layerGroup([line, head]).addTo(this.map);
+                });
+
+                Object.keys(this.routeLayers).forEach(id => {
+                    if (wanted[id]) return;
+
+                    this.map.removeLayer(this.routeLayers[id]);
+                    delete this.routeLayers[id];
                 });
             },
 

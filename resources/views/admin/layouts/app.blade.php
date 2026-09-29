@@ -32,6 +32,19 @@
         .wh-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
         .wh-sidebar-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .wh-sidebar-scroll:hover::-webkit-scrollbar-thumb { background: #94a3b8; }
+
+        /*
+         * The shell's own colours, declared rather than waited for.
+         *
+         * `bg-[#FCF9F6]` on the body and on the sidebar, and `bg-[#FFE8DA]` on the
+         * avatar, are arbitrary-value utilities — and an arbitrary value only
+         * exists in the built stylesheet if the build saw it. It did not, so the
+         * warm page background and the sidebar tint were never applied and the
+         * portal rendered flat white. The classes stay on the markup for the next
+         * rebuild; these rules cover it until then.
+         */
+        .bg-\[\#FCF9F6\] { background-color: #FCF9F6; }
+        .bg-\[\#FFE8DA\] { background-color: #FFE8DA; }
     </style>
 </head>
 {{-- Added 'font-sans' here to force Tailwind's typography --}}
