@@ -184,8 +184,11 @@ class DriverTransportController extends Controller
                  * same warehouse.
                  */
                 ->with([
-                    'originWarehouse:id,name,code,address,latitude,longitude',
-                    'destinationWarehouse:id,name,code,address,latitude,longitude',
+                    'originWarehouse:id,name,code,address,latitude,longitude,region_id,district_id',
+                    'originWarehouse.region:id,name',
+                    'destinationWarehouse:id,name,code,address,latitude,longitude,region_id,district_id',
+                    'destinationWarehouse.region:id,name',
+                    'destinationWarehouse.district:id,name',
                 ])
                 /*
                  * Counted, not loaded. The payload reads `items_count`, and this
@@ -278,8 +281,11 @@ class DriverTransportController extends Controller
                     $manifests = collect([
                         $bridged
                             ->load([
-                                'originWarehouse:id,name,code,address,latitude,longitude',
-                                'destinationWarehouse:id,name,code,address,latitude,longitude',
+                                'originWarehouse:id,name,code,address,latitude,longitude,region_id,district_id',
+                                'originWarehouse.region:id,name',
+                                'destinationWarehouse:id,name,code,address,latitude,longitude,region_id,district_id',
+                                'destinationWarehouse.region:id,name',
+                                'destinationWarehouse.district:id,name',
                             ])
                             ->loadCount(['items', 'containers']),
                     ]);
@@ -336,9 +342,24 @@ class DriverTransportController extends Controller
                         'address' => $m->destinationWarehouse->address,
                         'latitude' => $m->destinationWarehouse->latitude !== null ? (float) $m->destinationWarehouse->latitude : null,
                         'longitude' => $m->destinationWarehouse->longitude !== null ? (float) $m->destinationWarehouse->longitude : null,
+                        'region_id' => $m->destinationWarehouse->region_id,
+                        'region' => $m->destinationWarehouse->region?->name,
+                        'district_id' => $m->destinationWarehouse->district_id,
+                        'district' => $m->destinationWarehouse->district?->name,
                     ] : null,
                     'destination_lat' => $m->destinationWarehouse?->latitude !== null ? (float) $m->destinationWarehouse->latitude : null,
                     'destination_lng' => $m->destinationWarehouse?->longitude !== null ? (float) $m->destinationWarehouse->longitude : null,
+                    /*
+                     * The destination region, flat, so one trip can be held to one
+                     * region without the client guessing. A driver must not be able
+                     * to add a batch landing in another region to a trip already
+                     * carrying one — the rule is enforced server-side, and these
+                     * are the names the app needs to say which two regions clashed.
+                     */
+                    'destination_region_id' => $m->destinationWarehouse?->region_id,
+                    'destination_region' => $m->destinationWarehouse?->region?->name,
+                    'destination_district_id' => $m->destinationWarehouse?->district_id,
+                    'destination_district' => $m->destinationWarehouse?->district?->name,
                     'package_count' => (int) ($m->items_count ?? ($m->relationLoaded('items') ? $m->items->count() : 0)),
                     // The raw counts, so the client is not parsing a number out
                     // of a display field to decide whether anything is loaded.

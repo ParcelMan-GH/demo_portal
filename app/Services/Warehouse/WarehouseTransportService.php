@@ -769,6 +769,127 @@ class WarehouseTransportService
      * reads "Ready" at the warehouse) and `assigned`. Claiming never resurrects
      * a box that is already on the road or already closed.
      */
+    /**
+     * Which trip a batch belongs to.
+     *
+     * A trip serves one destination region. Two batches bound for the same region
+     * can ride together, even when they land at different warehouses inside it;
+     * two batches bound for different regions cannot, because that asks one
+     * driver to run two dispatch routes at once.
+     *
+     * When a warehouse has no region on file the warehouse itself becomes the
+     * destination, so a batch whose region is unknown still cannot be mixed with
+     * one whose region is known.
+     *
+     * Returns ['key' => string|null, 'label' => string]. A null key means the
+     * batch carries no destination at all, so there is nothing to compare.
+     */
+    public function destinationRegion(TransportManifest $manifest): array
+    {
+        $manifest->loadMissing('destinationWarehouse.region');
+
+        $warehouse = $manifest->destinationWarehouse;
+
+        if (! $warehouse) {
+            return ['key' => null, 'label' => 'Destination not recorded'];
+        }
+
+        if ($warehouse->region_id) {
+            return [
+                'key' => 'region:'.$warehouse->region_id,
+                'label' => $warehouse->region?->name ?? 'Region #'.$warehouse->region_id,
+            ];
+        }
+
+        return [
+            'key' => 'warehouse:'.$warehouse->id,
+            'label' => $warehouse->name,
+        ];
+    }
+
+    /**
+     * The region clash between this batch and the driver's live trip, if any.
+     *
+     * "Live" is assigned, loading and in transit: a batch already delivered or
+     * cancelled has left the trip, and a draft that was never handed to anyone is
+     * not on it. The batch being compared is excluded from its own search, so
+     * re-loading the batch a driver already holds never reports a clash with
+     * itself.
+     */
+    public function tripRegionConflict(TransportManifest $manifest, Driver $driver): ?array
+    {
+        $destination = $this->destinationRegion($manifest);
+
+        if ($destination['key'] === null) {
+            return null;
+        }
+
+        $active = TransportManifest::query()
+            ->where('assigned_driver_id', $driver->id)
+            ->where('id', '!=', $manifest->id)
+            ->whereIn('status', [
+                TransportManifest::STATUS_ASSIGNED,
+                TransportManifest::STATUS_LOADING,
+                TransportManifest::STATUS_IN_TRANSIT,
+            ])
+            ->with('destinationWarehouse.region')
+            ->get();
+
+        foreach ($active as $other) {
+            $onTrip = $this->destinationRegion($other);
+
+            if ($onTrip['key'] === null || $onTrip['key'] === $destination['key']) {
+                continue;
+            }
+
+            return [
+                'current_region' => $onTrip['label'],
+                'current_manifest' => $other->manifest_number,
+                'new_region' => $destination['label'],
+                'new_manifest' => $manifest->manifest_number,
+                'message' => 'You have active items heading to '.$onTrip['label']
+                    .'. You cannot add batches destined for '.$destination['label'].' to the same trip.',
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Take the batch, or say why it cannot be taken.
+     *
+     * Returns null once the batch is this driver's, or the payload the API should
+     * refuse with. The region rule is the reason a batch that exists and is free
+     * still cannot be taken, so it is reported as itself rather than as a bare
+     * "not found" — the driver needs to see which two regions clashed.
+     *
+     * A batch the driver already holds is never refused on region: it is already
+     * on their trip, and abandoning it mid-run strands the parcels.
+     */
+    private function claimRefusal(TransportManifest $manifest, Driver $driver): ?array
+    {
+        $mineAlready = (int) ($manifest->assigned_driver_id ?? 0) === (int) $driver->id;
+
+        if (! $mineAlready) {
+            $conflict = $this->tripRegionConflict($manifest, $driver);
+
+            if ($conflict !== null) {
+                return [
+                    'success' => false,
+                    'code' => 'region_mismatch',
+                    'message' => $conflict['message'],
+                    'data' => $conflict,
+                ];
+            }
+        }
+
+        if ($this->claimManifest($manifest, $driver)) {
+            return null;
+        }
+
+        return ['success' => false, 'message' => 'Manifest not found.'];
+    }
+
     public function claimManifest(TransportManifest $manifest, Driver $driver): bool
     {
         $owner = (int) ($manifest->assigned_driver_id ?? 0);
@@ -785,6 +906,18 @@ class WarehouseTransportService
             return false;
         }
 
+        /*
+         * One trip, one region.
+         *
+         * Checked here rather than only in the API layer, so every caller — the
+         * app's claim, the scan that bridges a batch, the detail screen — is
+         * held to it. A batch that clashes is left unclaimed for a driver who is
+         * actually going that way.
+         */
+        if ($this->tripRegionConflict($manifest, $driver) !== null) {
+            return false;
+        }
+
         $manifest->update([
             'assigned_driver_id' => $driver->id,
             'assigned_at' => $manifest->assigned_at ?? now(),
@@ -796,8 +929,8 @@ class WarehouseTransportService
 
     public function driverStartLoading(TransportManifest $manifest, Driver $driver): array
     {
-        if (! $this->claimManifest($manifest, $driver)) {
-            return ['success' => false, 'message' => 'Manifest not found.'];
+        if ($refusal = $this->claimRefusal($manifest, $driver)) {
+            return $refusal;
         }
 
         if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
@@ -818,8 +951,8 @@ class WarehouseTransportService
 
     public function driverScanLoad(TransportManifest $manifest, Driver $driver, string $trackingCode): array
     {
-        if (! $this->claimManifest($manifest, $driver)) {
-            return ['success' => false, 'message' => 'Manifest not found.'];
+        if ($refusal = $this->claimRefusal($manifest, $driver)) {
+            return $refusal;
         }
 
         if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {
@@ -2114,8 +2247,8 @@ class WarehouseTransportService
 
     public function driverDepart(TransportManifest $manifest, Driver $driver): array
     {
-        if (! $this->claimManifest($manifest, $driver)) {
-            return ['success' => false, 'message' => 'Manifest not found.'];
+        if ($refusal = $this->claimRefusal($manifest, $driver)) {
+            return $refusal;
         }
 
         if (! in_array($manifest->status, [TransportManifest::STATUS_ASSIGNED, TransportManifest::STATUS_LOADING], true)) {

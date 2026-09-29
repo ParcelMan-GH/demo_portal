@@ -119,9 +119,28 @@ class DriverTransportService
     public function show(Driver $driver, TransportManifest $manifest): array
     {
         if ((int) $manifest->assigned_driver_id !== (int) $driver->id) {
-            // Pool manifests (no transporter yet) are taken over by the first
-            // driver who opens them, so batches dispatched unassigned still work.
+            /*
+             * Pool manifests (no transporter yet) are taken over by the first
+             * driver who opens them, so batches dispatched unassigned still work.
+             *
+             * That takeover goes through the same claim as the app's scan, so it
+             * obeys the same one-trip-one-region rule. It used to forceFill the
+             * driver straight onto the manifest, which let a driver open a batch
+             * the scan would have refused and quietly put two regions on one trip.
+             */
             if (empty($manifest->assigned_driver_id)) {
+                $conflict = $this->warehouseTransportService->tripRegionConflict($manifest, $driver);
+
+                if ($conflict !== null) {
+                    return [
+                        'success' => false,
+                        'code' => 'region_mismatch',
+                        'message' => $conflict['message'],
+                        'data' => $conflict,
+                        'status' => 409,
+                    ];
+                }
+
                 $manifest->forceFill([
                     'assigned_driver_id' => $driver->id,
                     'assigned_at' => $manifest->assigned_at ?: now(),
@@ -135,8 +154,11 @@ class DriverTransportService
         }
 
         $manifest->load([
-            'originWarehouse:id,name,code,address,latitude,longitude,contact_phone',
-            'destinationWarehouse:id,name,code,address,latitude,longitude,contact_phone',
+            'originWarehouse:id,name,code,address,latitude,longitude,contact_phone,region_id,district_id',
+            'originWarehouse.region:id,name',
+            'destinationWarehouse:id,name,code,address,latitude,longitude,contact_phone,region_id,district_id',
+            'destinationWarehouse.region:id,name',
+            'destinationWarehouse.district:id,name',
             'items.shipmentItem.shipment:id,shipment_number',
             'items.shipmentItem:id,shipment_id,description,tracking_code',
             'containers.items.manifestItem.shipmentItem:id,shipment_id,description,tracking_code',
@@ -188,7 +210,17 @@ class DriverTransportService
                 'latitude' => $manifest->destinationWarehouse->latitude,
                 'longitude' => $manifest->destinationWarehouse->longitude,
                 'contact_phone' => $manifest->destinationWarehouse->contact_phone,
+                'region_id' => $manifest->destinationWarehouse->region_id,
+                'region' => $manifest->destinationWarehouse->region?->name,
+                'district_id' => $manifest->destinationWarehouse->district_id,
+                'district' => $manifest->destinationWarehouse->district?->name,
             ] : null,
+            // Flat, so the app can hold a trip to one region from this payload
+            // alone. See DriverTransportController::index() for the rule.
+            'destination_region_id' => $manifest->destinationWarehouse?->region_id,
+            'destination_region' => $manifest->destinationWarehouse?->region?->name,
+            'destination_district_id' => $manifest->destinationWarehouse?->district_id,
+            'destination_district' => $manifest->destinationWarehouse?->district?->name,
             'timeline' => [
                 'assigned' => ['at' => $manifest->assigned_at],
                 'dispatched' => ['at' => $manifest->dispatched_at],
