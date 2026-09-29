@@ -44,6 +44,11 @@
         height: 6px;
         background-color: #64748b;
     }
+    /* A transporter carrying a batch between hubs, not a city delivery round. */
+    .custom-map-marker.is-transport .marker-pin,
+    .custom-map-marker.is-transport .marker-pin::after {
+        background-color: #f97316; /* Orange */
+    }
     /* Active State for Marker */
     .custom-map-marker.active .marker-pin,
     .custom-map-marker.active .marker-pin::after {
@@ -120,13 +125,15 @@
             <div class="text-4xl font-normal text-slate-900 mb-6">{{ $onTimeDeliveryRate }}%</div>
             <div class="flex items-center justify-between text-xs">
                 <span class="text-slate-400">vs last month</span>
-                <span class="{{ $onTimeChange >= 0 ? 'text-emerald-500' : 'text-rose-500' }} font-medium">
-                    {{ $onTimeChange > 0 ? '+' : '' }}{{ $onTimeChange }}%
-                </span>
+                @if(is_null($onTimeChange))
+                    {{-- No deliveries last month: there is no honest comparison. --}}
+                    <span class="text-slate-400 font-medium" title="No deliveries were completed last month to compare against">—</span>
+                @else
+                    <span class="{{ $onTimeChange >= 0 ? 'text-emerald-500' : 'text-rose-500' }} font-medium">
+                        {{ $onTimeChange > 0 ? '+' : '' }}{{ $onTimeChange }}%
+                    </span>
+                @endif
             </div>
-        </div>
-
-    </div>
 
     {{-- ═══ MAIN CONTENT GRID ═══ --}}
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -134,7 +141,13 @@
         {{-- Left: Live Tracking Map --}}
         <div class="xl:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
             <div class="px-6 py-4 flex items-center justify-between border-b border-slate-100 z-10">
-                <h2 class="text-sm font-medium text-slate-700">Live Tracking</h2>
+                <div class="flex items-baseline gap-3">
+                    <h2 class="text-sm font-medium text-slate-700">Live Tracking</h2>
+                    <span class="text-xs text-slate-400 font-medium"
+                          x-text="riders.length === 0
+                              ? ''
+                              : riders.length + (riders.length === 1 ? ' rider on the road' : ' riders on the road')"></span>
+                </div>
                 <span class="text-xs text-slate-400 font-medium" x-show="riders.length" x-text="lastUpdated ? 'Updated ' + lastUpdated : ''"></span>
                 <div class="flex items-center gap-3">
                     <div class="relative">
@@ -153,9 +166,41 @@
                    <div class="w-14 h-14 rounded-full bg-slate-200 flex items-center justify-center mb-3">
                        <svg class="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                    </div>
-                   <p class="text-sm font-medium text-slate-700">No active deliveries</p>
-                   <p class="text-xs text-slate-400 mt-1">Riders will appear here automatically when they're out on a run.</p>
-               </div>
+                    <p class="text-sm font-medium text-slate-700">No riders on the road</p>
+                    <p class="text-xs text-slate-400 mt-1">Delivery riders and transporters carrying batches appear here as soon as they're out.</p>
+                </div>
+
+                {{--
+                    Everyone who is out, whether or not we can place them.
+
+                    Riders used to be dropped from this panel entirely when they had
+                    no coordinates, which meant "on a run but the phone hasn't
+                    reported" looked exactly like "nobody is working". The list
+                    names them either way and says which it is.
+                --}}
+                <div x-show="riders.length > 0" x-cloak
+                     class="absolute bottom-4 left-4 w-72 max-h-[340px] overflow-y-auto bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200 z-[900]">
+                    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md">
+                        <span class="text-xs font-semibold text-slate-600">On the road</span>
+                        <span class="text-[11px] text-slate-400" x-text="`${riders.filter(r => r.has_position).length} located`"></span>
+                    </div>
+                    <template x-for="rider in riders" :key="rider.id">
+                        <button type="button" @click="selectRider(rider.id)"
+                                class="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
+                            <img :src="rider.avatar" alt="" class="w-8 h-8 rounded-full object-cover flex-shrink-0">
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-semibold text-slate-800 truncate" x-text="rider.full_name"></p>
+                                <p class="text-[11px] text-slate-500 truncate" x-text="rider.reference + (rider.destination ? ' → ' + rider.destination : '')"></p>
+                                <p class="text-[11px] mt-0.5"
+                                   :class="rider.has_position ? 'text-emerald-600' : 'text-slate-400'"
+                                   x-text="positionLabel(rider)"></p>
+                            </div>
+                            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex-shrink-0"
+                                  :class="rider.kind === 'transport' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'"
+                                  x-text="rider.kind === 'transport' ? 'Transport' : 'Delivery'"></span>
+                        </button>
+                    </template>
+                </div>
 
                {{-- EXACT FIXED SIDE PANEL FROM YOUR SCREENSHOT --}}
                <div x-show="selectedRider" style="display: none;"
@@ -183,8 +228,11 @@
                     </div>
 
                     <div class="text-center mb-6">
-                        <h3 class="text-xl font-bold text-slate-900" x-text="selectedRider?.name">Vincent</h3>
-                        <span class="inline-block mt-1 text-xs font-semibold text-blue-800 bg-blue-100 px-3 py-0.5 rounded-full">Rider</span>
+                        <h3 class="text-xl font-bold text-slate-900" x-text="selectedRider?.full_name || selectedRider?.name || 'Rider'">Rider</h3>
+                        <p class="text-xs text-slate-500 mt-1 truncate" x-text="selectedRider?.reference"></p>
+                        <span class="inline-block mt-2 text-xs font-semibold px-3 py-0.5 rounded-full"
+                              :class="selectedRider?.kind === 'transport' ? 'text-amber-800 bg-amber-100' : 'text-blue-800 bg-blue-100'"
+                              x-text="selectedRider?.kind === 'transport' ? 'Transporter' : 'Delivery rider'"></span>
                     </div>
 
                     <!-- Stats Row -->
@@ -213,6 +261,9 @@
                             <div class="absolute -left-[29px] top-0.5 w-4 h-4 bg-slate-900 rounded-full border-[3px] border-slate-50"></div>
                             <p class="text-sm font-bold text-slate-900">Current Location</p>
                             <p class="text-xs text-slate-500 mt-0.5" x-text="selectedRider?.current_location">Unknown</p>
+                            <p class="text-[11px] mt-1 font-medium"
+                               :class="selectedRider?.has_position ? 'text-emerald-600' : 'text-slate-400'"
+                               x-text="positionLabel(selectedRider)"></p>
                         </div>
                         
                         <div class="relative">
@@ -237,31 +288,46 @@
                 </button>
             </div>
             
+            {{--
+                Real events, newest first.
+
+                This used to list the ten most recent Shipment rows and nothing
+                else, so the transport side of the operation — a batch raised,
+                dispatched, arrived, received, a payment taken — never appeared.
+                Every entry below is a timestamp the system actually wrote; if it
+                did not happen, it is not listed.
+            --}}
             <div class="p-6 overflow-y-auto max-h-[600px]">
                 <div class="relative space-y-6 before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-100 before:to-transparent">
-                    
-                    @forelse($recentShipments as $shipment)
-                        @php
-                            $rawStatus = $shipment->status instanceof \BackedEnum ? $shipment->status->value : $shipment->status;
-                            $cleanStatus = strtolower((string) $rawStatus);
 
-                            $statusColor = match($cleanStatus) {
-                                'delivered' => 'bg-emerald-500',
-                                'in_transit' => 'bg-amber-500',
-                                'at_warehouse' => 'bg-purple-500',
-                                'submitted' => 'bg-blue-500',
+                    @forelse($activityFeedItems as $event)
+                        @php
+                            $dotColor = match($event['tone']) {
+                                'emerald' => 'bg-emerald-500',
+                                'amber' => 'bg-amber-500',
+                                'violet' => 'bg-purple-500',
+                                'blue' => 'bg-blue-500',
+                                'orange' => 'bg-orange-500',
                                 default => 'bg-slate-400',
                             };
-                            
-                            $dateObj = $shipment->updated_at ?? $shipment->created_at;
                         @endphp
                         <div class="relative flex items-start gap-4">
-                            <div class="w-4 h-4 rounded-full border-4 border-white shadow-sm {{ $statusColor }} flex-shrink-0 mt-1 z-10 relative"></div>
+                            <div class="w-4 h-4 rounded-full border-4 border-white shadow-sm {{ $dotColor }} flex-shrink-0 mt-1 z-10 relative"></div>
                             <div class="flex-1 min-w-0 border-b border-slate-100 pb-4">
                                 <p class="text-sm text-slate-900 font-medium truncate">
-                                    {{ $shipment->shipment_number }} advanced to <span class="capitalize">{{ str_replace('_', ' ', $cleanStatus) }}</span>
+                                    @if($event['url'])
+                                        <a href="{{ $event['url'] }}" class="hover:text-orange-600 transition-colors">{{ $event['label'] }}</a>
+                                    @else
+                                        {{ $event['label'] }}
+                                    @endif
                                 </p>
-                                <p class="text-xs text-slate-400 mt-1">{{ $dateObj ? $dateObj->diffForHumans() : 'Recently' }}</p>
+                                <p class="text-xs text-slate-500 mt-0.5 truncate font-medium">{{ $event['detail'] }}</p>
+                                <p class="text-xs text-slate-400 mt-1">
+                                    {{ $event['at']->diffForHumans() }}
+                                    @if($event['actor'])
+                                        · {{ $event['actor'] }}
+                                    @endif
+                                </p>
                             </div>
                         </div>
                     @empty
@@ -303,32 +369,77 @@
                 // (prevents the blank grey map caused by a 0-height container)
                 setTimeout(() => this.map.invalidateSize(), 150);
 
-                // Add markers
-                this.riders.forEach(rider => {
-                    this.addRiderMarker(rider);
-                });
+                // Same code path as every poll, so a rider who reports in later
+                // appears without the admin reloading the page.
+                this.syncMarkers();
 
                 // Poll for live position updates every 12 seconds
                 this.pollTimer = setInterval(() => this.refreshRiders(), 12000);
             },
 
-            addRiderMarker(rider) {
+            /**
+             * What to say about where a rider is, in words.
+             *
+             * A rider with no fix is not hidden any more — "we have not heard
+             * from this phone" is a different thing from "this rider is not
+             * working", and the admin needs to know which one they are looking at.
+             */
+            positionLabel(rider) {
+                if (!rider) return '';
+                if (!rider.has_position) return 'Position unknown — no fix from the phone yet';
+                if (rider.position_age_minutes === null || rider.position_age_minutes === undefined) return 'Position reported';
+
+                const age = rider.position_age_minutes;
+                if (age <= 1) return 'Live · reported just now';
+
+                return (rider.position_is_live ? 'Live · ' : 'Last seen ') + age + ' min ago';
+            },
+
+            markerElement(rider) {
+                // A transporter and a delivery rider are different jobs, so the pin
+                // says which without the admin having to open the panel.
                 const el = document.createElement('div');
-                el.className = 'custom-map-marker';
+                el.className = 'custom-map-marker' + (rider.kind === 'transport' ? ' is-transport' : '');
                 el.innerHTML = `
                     <div class="marker-label">${rider.name}</div>
                     <div class="marker-pin"></div>
                 `;
+                return el;
+            },
 
-                const icon = L.divIcon({ html: el, className: '', iconSize: [40, 40], iconAnchor: [20, 20] });
-                const marker = L.marker([rider.lat, rider.lng], { icon }).addTo(this.map);
+            /**
+             * Put a pin on everyone we can place, and take pins off everyone we
+             * cannot.
+             *
+             * Riders are keyed by string ids ("manifest-18", "run-3"), so the
+             * removal check compares strings — it used to run `Number(id)` over
+             * them, which is NaN for every one of these, so every pin was deleted
+             * and re-added on every poll.
+             */
+            syncMarkers() {
+                const placed = this.riders.filter(r => r.has_position);
+                const placedIds = new Set(placed.map(r => String(r.id)));
 
-                // Store the Leaflet marker object (not the DOM element)
-                this.markers[rider.id] = marker;
+                placed.forEach(rider => {
+                    const id = String(rider.id);
+                    const existing = this.markers[id];
 
-                // Click event sets active rider in Alpine
-                marker.on('click', () => {
-                    this.selectRider(rider.id);
+                    if (existing) {
+                        existing.setLatLng([rider.lat, rider.lng]);
+                        return;
+                    }
+
+                    const icon = L.divIcon({ html: this.markerElement(rider), className: '', iconSize: [40, 40], iconAnchor: [20, 20] });
+                    const marker = L.marker([rider.lat, rider.lng], { icon }).addTo(this.map);
+                    marker.on('click', () => this.selectRider(rider.id));
+                    this.markers[id] = marker;
+                });
+
+                Object.keys(this.markers).forEach(id => {
+                    if (placedIds.has(String(id))) return;
+
+                    this.map.removeLayer(this.markers[id]);
+                    delete this.markers[id];
                 });
             },
 
@@ -340,24 +451,8 @@
                     if (!res.ok) return;
                     const riders = await res.json();
 
-                    // Move existing markers to their latest positions
-                    riders.forEach(rider => {
-                        const marker = this.markers[rider.id];
-                        if (marker && rider.lat && rider.lng) {
-                            marker.setLatLng([rider.lat, rider.lng]);
-                        }
-                    });
-
-                    // Remove markers for runs that are no longer active
-                    const activeIds = new Set(riders.map(r => r.id));
-                    Object.keys(this.markers).forEach(id => {
-                        if (!activeIds.has(Number(id))) {
-                            this.map.removeLayer(this.markers[id]);
-                            delete this.markers[id];
-                        }
-                    });
-
                     this.riders = riders;
+                    this.syncMarkers();
 
                     // Keep the side panel in sync with fresh data
                     if (this.selectedRider) {
