@@ -10,6 +10,7 @@ function buildPickupsTable(config) {
         updateEndpointTemplate: config.updateEndpointTemplate,
         cancelEndpointTemplate: config.cancelEndpointTemplate,
         receiveEndpointTemplate: config.receiveEndpointTemplate,
+        assignEndpointTemplate: config.assignEndpointTemplate,
         csrfToken: '',
 
         assignments: [],
@@ -33,6 +34,7 @@ function buildPickupsTable(config) {
             { key: 'driver', label: 'Rider' },
             { key: 'warehouse', label: 'Target Warehouse' },
             { key: 'status', label: 'Status' },
+            { key: 'vehicles', label: 'Required Vehicles' },
             { key: 'assigned_at', label: 'Assigned At' },
             { key: 'completed_at', label: 'Completed At' },
             { key: 'assigned_by', label: 'Assigned By' },
@@ -44,6 +46,7 @@ function buildPickupsTable(config) {
             driver: true,
             warehouse: true,
             status: true,
+            vehicles: true,
             assigned_at: true,
             completed_at: true,
             assigned_by: true,
@@ -73,6 +76,15 @@ function buildPickupsTable(config) {
         receiveTarget: null,
         receiveForm: { received_warehouse_id: '', receive_notes: '' },
 
+        // Dispatch Details (per-shipment multi-slot surface)
+        showDispatchModal: false,
+        dispatchTargetId: null,
+        dispatchTarget: null,
+        dispatchSlots: [],
+        // One-shot message handed to the rebuilt slot rows after a successful
+        // assign, so the result still lands on the slot that caused it.
+        dispatchFlash: null,
+
         init() {
             const csrfMeta = document.querySelector('meta[name="csrf-token"]');
             this.csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
@@ -99,6 +111,8 @@ function buildPickupsTable(config) {
 
                 this.assignments = data.data;
                 this.meta = data.meta;
+                // Keep the open dispatch panel in step with the refreshed rows.
+                this.refreshDispatchSlots();
             } catch (error) {
                 console.error('Failed to load pickup assignments:', error);
             } finally {
@@ -213,6 +227,316 @@ function buildPickupsTable(config) {
                 cancelled: 'bg-rose-100 text-rose-700',
             };
             return map[status] || 'bg-slate-100 text-slate-700';
+        },
+
+        // Coverage badge styling. Colour is a hint only — the label text is
+        // always rendered alongside it, so the state is legible without colour.
+        coverageBadgeClass(status) {
+            const map = {
+                unassigned: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200/70',
+                partially_assigned: 'bg-amber-100 text-amber-700 ring-1 ring-amber-200/70',
+                fully_assigned: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/70',
+            };
+            return map[status] || 'bg-slate-100 text-slate-600';
+        },
+
+        // "2x Motorbike, 1x Aboboyaa" straight from the row's slot breakdown —
+        // never recomputed here, the backend already derived it per shipment.
+        requiredVehiclesText(row) {
+            const breakdown = row?.slot_breakdown || [];
+            if (!breakdown.length) return 'No vehicle request';
+            return breakdown
+                .map((entry) => `${entry.required}x ${entry.name}`)
+                .join(', ');
+        },
+
+        // "2 of 3 slots filled" (or just the assigned count when no vehicle was
+        // ever requested, which has no slot total to measure against).
+        slotsFilledText(row) {
+            if (!row) return '';
+            if (!row.required_slots) {
+                return `${row.assigned_slots || 0} assigned`;
+            }
+            return `${row.assigned_slots || 0} of ${row.required_slots} slots filled`;
+        },
+
+        // Dispatch Details — one row per requested slot, or the legacy single
+        // rider when the shipment never requested a vehicle.
+        async openDispatchModal(row) {
+            this.dispatchTargetId = row.id;
+            this.dispatchTarget = row;
+            this.dispatchFlash = null;
+            this.dispatchSlots = this.buildDispatchSlots(row);
+            this.showDispatchModal = true;
+            await this.loadDropdownData();
+        },
+
+        closeDispatchModal() {
+            this.showDispatchModal = false;
+            this.dispatchTargetId = null;
+            this.dispatchTarget = null;
+            this.dispatchSlots = [];
+            this.dispatchFlash = null;
+        },
+
+        // Rebuild the slot rows from the current page rows, keeping the panel
+        // pointing at the same assignment after a reload.
+        refreshDispatchSlots() {
+            if (!this.showDispatchModal) return;
+            const fresh = this.assignments.find((a) => Number(a.id) === Number(this.dispatchTargetId));
+            if (fresh) this.dispatchTarget = fresh;
+            this.dispatchSlots = this.buildDispatchSlots(this.dispatchTarget);
+            this.dispatchFlash = null;
+        },
+
+        // Live assignments for the open shipment, used to label filled slots.
+        dispatchLiveAssignments() {
+            const shipmentId = this.dispatchTarget?.shipment_id;
+            if (!shipmentId) return [];
+            return this.assignments.filter((a) => a.shipment_id === shipmentId && a.status !== 'cancelled');
+        },
+
+        buildDispatchSlots(row) {
+            if (!row) return [];
+
+            const live = this.dispatchLiveAssignments();
+            const breakdown = row.slot_breakdown || [];
+            const slots = [];
+
+            // Legacy flow: no vehicle was requested, so there are no slots to
+            // count. Keep offering the single-rider assign the shipment has
+            // always used, alongside any riders already on it.
+            if (!breakdown.length) {
+                // Assignments are created in claim order, so id order is slot order.
+                const existing = live.slice().sort((x, y) => (x.id || 0) - (y.id || 0));
+                existing.forEach((assignment, index) => {
+                    slots.push(this.buildFilledSlot({
+                        key: `legacy-${assignment.id}`,
+                        label: `Pickup Rider ${index + 1}`,
+                        subtitle: 'Legacy pickup (no vehicle request)',
+                        vehicleTypeId: null,
+                        assignment,
+                    }));
+                });
+                slots.push({
+                    key: 'legacy-open',
+                    label: 'Assign Rider',
+                    subtitle: 'Legacy pickup (no vehicle request)',
+                    vehicle_type_id: null,
+                    filled: false,
+                    unavailable: false,
+                    driver_id: '',
+                    target_warehouse_id: row.target_warehouse_id || '',
+                    search: '',
+                    open: false,
+                    activeIndex: -1,
+                    saving: false,
+                    error: '',
+                    success: '',
+                });
+                return slots;
+            }
+
+            let slotNumber = 1;
+            breakdown.forEach((entry) => {
+                const typeId = entry.vehicle_type_id ?? null;
+                const required = Number(entry.required) || 0;
+                const assigned = Number(entry.assigned) || 0;
+                const matches = typeId
+                    ? live
+                        .filter((a) => Number(a.pickup_vehicle_type_id) === Number(typeId))
+                        .sort((x, y) => (x.id || 0) - (y.id || 0))
+                    : [];
+
+                for (let i = 0; i < required; i++) {
+                    const filled = i < assigned;
+                    const match = filled ? matches[i] : null;
+                    const label = `Slot ${slotNumber} - ${entry.name}`;
+                    slotNumber++;
+
+                    if (filled) {
+                        slots.push(this.buildFilledSlot({
+                            key: `type-${typeId}-${i}`,
+                            label,
+                            subtitle: 'Assigned',
+                            vehicleTypeId: typeId,
+                            assignment: match,
+                        }));
+                        continue;
+                    }
+
+                    // A requested type whose type row is gone (nullOnDelete) can
+                    // never be claimed again, so it is offered as unavailable
+                    // rather than as an assignable slot.
+                    slots.push({
+                        key: `type-${typeId}-${i}`,
+                        label,
+                        subtitle: typeId ? 'Awaiting rider' : 'Vehicle type no longer exists',
+                        vehicle_type_id: typeId,
+                        filled: false,
+                        unavailable: !typeId,
+                        driver_id: '',
+                        target_warehouse_id: row.target_warehouse_id || '',
+                        search: '',
+                        open: false,
+                        activeIndex: -1,
+                        saving: false,
+                        error: '',
+                        success: '',
+                    });
+                }
+            });
+
+            // Hand the success message from the assign that just happened back to
+            // the slot it filled, so the rebuild does not swallow the result.
+            if (this.dispatchFlash) {
+                const flash = this.dispatchFlash;
+                const candidates = slots.filter((slot) => slot.filled
+                    && (slot.vehicle_type_id ?? null) === (flash.typeId ?? null));
+                if (candidates.length) {
+                    candidates[candidates.length - 1].success = flash.message;
+                }
+            }
+
+            return slots;
+        },
+
+        buildFilledSlot({ key, label, subtitle, vehicleTypeId, assignment }) {
+            return {
+                key,
+                label,
+                subtitle,
+                vehicle_type_id: vehicleTypeId,
+                filled: true,
+                unavailable: false,
+                assignment_id: assignment?.id ?? null,
+                rider_name: assignment?.driver_name ?? 'Assigned',
+                rider_phone: assignment?.driver_phone ?? '',
+                canManage: !!assignment && !['completed', 'cancelled'].includes(assignment.status),
+                driver_id: '',
+                target_warehouse_id: '',
+                search: '',
+                open: false,
+                activeIndex: -1,
+                saving: false,
+                error: '',
+                success: '',
+            };
+        },
+
+        // Rider picker, reused from the edit modal but scoped to one slot.
+        slotDrivers(slot) {
+            const query = String(slot.search || '').trim().toLowerCase();
+            if (!query) return this.availableDrivers;
+            return this.availableDrivers.filter((driver) => [driver.name, driver.phone, driver.vehicle_type, driver.vehicle_number]
+                .filter(Boolean)
+                .some((value) => String(value).toLowerCase().includes(query)));
+        },
+
+        selectSlotDriver(slot, driver) {
+            slot.driver_id = driver.id;
+            slot.search = `${driver.name}${driver.phone ? ` / ${driver.phone}` : ''}`;
+            slot.open = false;
+            slot.activeIndex = -1;
+            slot.error = '';
+        },
+
+        moveSlotDriverFocus(slot, direction) {
+            const drivers = this.slotDrivers(slot);
+            if (!drivers.length) return;
+            slot.open = true;
+            slot.activeIndex = slot.activeIndex < 0
+                ? (direction > 0 ? 0 : drivers.length - 1)
+                : (slot.activeIndex + direction + drivers.length) % drivers.length;
+        },
+
+        selectActiveSlotDriver(slot) {
+            const driver = this.slotDrivers(slot)[slot.activeIndex];
+            if (driver) this.selectSlotDriver(slot, driver);
+        },
+
+        // Claim the slot: send the slot's own vehicle type id so the backend
+        // records which slot is being filled. Legacy slots send none, which is
+        // the pre-existing single-rider path.
+        async assignSlot(slot, confirmBusy = false) {
+            slot.error = '';
+            slot.success = '';
+
+            if (!slot.driver_id) {
+                slot.error = 'Select a rider first.';
+                return;
+            }
+            if (!slot.target_warehouse_id) {
+                slot.error = 'Select a target warehouse.';
+                return;
+            }
+
+            slot.saving = true;
+            try {
+                const url = this.assignEndpointTemplate.replace('__ID__', this.dispatchTarget.shipment_id);
+                const payload = {
+                    driver_id: slot.driver_id,
+                    target_warehouse_id: slot.target_warehouse_id,
+                    confirm_busy_assignment: confirmBusy,
+                };
+                if (slot.vehicle_type_id) {
+                    payload.pickup_vehicle_type_id = slot.vehicle_type_id;
+                }
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': this.csrfToken,
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+
+                if (response.status === 409 && data.code === 'rider_busy' && !confirmBusy) {
+                    const work = data.data?.active_work || {};
+                    if (window.confirm(`${data.message}\n\n${work.pickups || 0} pickup, ${work.transports || 0} transport, ${work.deliveries || 0} delivery.\n\nAssign anyway?`)) {
+                        slot.saving = false;
+                        return this.assignSlot(slot, true);
+                    }
+                    slot.error = data.message || 'Rider is busy.';
+                    slot.saving = false;
+                    return;
+                }
+
+                if (data.success) {
+                    const message = data.message || 'Rider assigned successfully.';
+                    slot.success = message;
+                    if (window.showToast) window.showToast(message, 'success');
+                    this.dispatchFlash = { typeId: slot.vehicle_type_id ?? null, message };
+                    await this.loadData();
+                } else {
+                    // Backend refusal (all slots of a type already assigned, or a
+                    // type that was never requested) stays on the slot that caused
+                    // it rather than surfacing as a page-level error.
+                    slot.error = data.message || 'Failed to assign rider.';
+                }
+            } catch (error) {
+                console.error('Assign slot error:', error);
+                slot.error = 'Failed to assign rider.';
+            } finally {
+                slot.saving = false;
+            }
+        },
+
+        findAssignment(id) {
+            return this.assignments.find((a) => Number(a.id) === Number(id)) || null;
+        },
+
+        openEditModalById(id) {
+            const assignment = this.findAssignment(id);
+            if (assignment) this.openEditModal(assignment);
+        },
+
+        openCancelModalById(id) {
+            const assignment = this.findAssignment(id);
+            if (assignment) this.openCancelModal(assignment);
         },
 
         // Edit modal

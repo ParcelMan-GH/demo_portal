@@ -14,6 +14,7 @@
         'updateEndpointTemplate' => url('/admin/assignments/__ID__/update'),
         'cancelEndpointTemplate' => url('/admin/assignments/__ID__/cancel'),
         'receiveEndpointTemplate' => url('/admin/assignments/__ID__/receive'),
+        'assignEndpointTemplate' => url('/admin/shipments/__ID__/assign-driver'),
         'statuses' => $statuses,
     ];
 @endphp
@@ -215,6 +216,9 @@
                                 </svg>
                             </div>
                         </th>
+                        <th x-show="visibleColumns.vehicles" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                            REQUIRED VEHICLES
+                        </th>
                         <th x-show="visibleColumns.assigned_at" @@click="sort('assigned_at')" class="px-4 py-2 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer">
                             <div class="flex items-center">
                                 ASSIGNED AT
@@ -244,7 +248,7 @@
                 <tbody class="bg-transparent divide-y divide-slate-100/50">
                     <template x-if="assignments.length === 0 && !loading">
                         <tr>
-                            <td colspan="9" class="px-4 py-8 text-center text-gray-500 text-xs">
+                            <td colspan="10" class="px-4 py-8 text-center text-gray-500 text-xs">
                                 <div class="flex flex-col items-center gap-2">
                                     <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
@@ -276,8 +280,19 @@
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
                                       :class="statusBadgeClass(a.status)"
                                       x-text="a.status_label"></span>
-                            </td>
-                            <td x-show="visibleColumns.assigned_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(a.assigned_at)"></td>
+                             </td>
+                             <td x-show="visibleColumns.vehicles" class="px-4 py-2.5 whitespace-nowrap">
+                                 <div class="space-y-1">
+                                     <div class="text-xs text-slate-700" x-text="requiredVehiclesText(a)"></div>
+                                     <div class="flex items-center gap-1.5">
+                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                                               :class="coverageBadgeClass(a.coverage_status)"
+                                               x-text="a.coverage_label"></span>
+                                         <span class="text-[10px] text-slate-500" x-text="slotsFilledText(a)"></span>
+                                     </div>
+                                 </div>
+                             </td>
+                             <td x-show="visibleColumns.assigned_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(a.assigned_at)"></td>
                             <td x-show="visibleColumns.completed_at" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="formatDateTime(a.completed_at)"></td>
                             <td x-show="visibleColumns.assigned_by" class="px-4 py-2.5 whitespace-nowrap text-xs text-slate-600" x-text="a.assigned_by"></td>
                             <td x-show="visibleColumns.actions" class="px-4 py-2.5 whitespace-nowrap text-center text-xs font-medium">
@@ -291,6 +306,15 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
                                     </a>
+                                    <!-- Dispatch Details -->
+                                    <button type="button"
+                                            @@click="openDispatchModal(a)"
+                                            class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors"
+                                            title="Dispatch Details">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/>
+                                        </svg>
+                                    </button>
                                     <!-- Edit (only when assigned) -->
                                     <button x-show="a.status === 'assigned'"
                                             type="button"
@@ -430,6 +454,145 @@
 
         </div>
     </div>
+
+<!-- Dispatch Details Modal -->
+<div x-show="showDispatchModal" x-cloak class="fixed inset-0 z-[95] overflow-y-auto" @@keydown.escape.window="closeDispatchModal()">
+    <div x-show="showDispatchModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" @@click="closeDispatchModal()"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div x-show="showDispatchModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" @@click.stop class="relative w-full max-w-2xl bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50">
+            <div class="px-6 py-5 border-b border-slate-200/50">
+                <h3 class="text-lg font-bold text-slate-900">Dispatch Details</h3>
+                <p class="text-sm text-slate-500 mt-1">Assign a rider to each requested slot for <strong x-text="dispatchTarget?.shipment_number"></strong></p>
+            </div>
+
+            <div class="px-6 py-5 space-y-4">
+                <!-- Required vehicles + coverage state -->
+                <div class="rounded-xl border border-slate-200/70 bg-slate-50/50 px-4 py-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="text-sm">
+                            <span class="font-semibold text-slate-700">Required Vehicles:</span>
+                            <span class="text-slate-600" x-text="requiredVehiclesText(dispatchTarget)"></span>
+                        </div>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold"
+                              :class="coverageBadgeClass(dispatchTarget?.coverage_status)"
+                              x-text="dispatchTarget?.coverage_label"></span>
+                    </div>
+                    <p class="mt-1 text-xs text-slate-500" x-text="slotsFilledText(dispatchTarget)"></p>
+                </div>
+
+                <!-- One row per requested slot -->
+                <div class="space-y-3">
+                    <template x-for="slot in dispatchSlots" :key="slot.key">
+                        <div class="rounded-xl border px-4 py-3"
+                             :class="slot.filled ? 'border-emerald-200 bg-emerald-50/40' : (slot.unavailable ? 'border-slate-200 bg-slate-50/40' : 'border-slate-200 bg-white')">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-bold text-slate-900" x-text="slot.label"></p>
+                                    <p class="text-[11px] text-slate-500" x-text="slot.subtitle"></p>
+                                </div>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0"
+                                      :class="slot.filled ? 'bg-emerald-100 text-emerald-700' : (slot.unavailable ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700')"
+                                      x-text="slot.filled ? 'Filled' : (slot.unavailable ? 'Unavailable' : 'Open')"></span>
+                            </div>
+
+                            <!-- Filled slot: current rider + change / cancel that slot -->
+                            <template x-if="slot.filled">
+                                <div class="mt-3 flex items-center justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-semibold text-slate-900" x-text="slot.rider_name"></p>
+                                        <p class="text-[10px] text-slate-500" x-text="slot.rider_phone"></p>
+                                        <p x-show="slot.success" class="mt-1 text-[10px] font-semibold text-emerald-600" x-text="slot.success"></p>
+                                    </div>
+                                    <div class="flex items-center gap-1 flex-shrink-0" x-show="slot.canManage">
+                                        <button type="button" @@click="openEditModalById(slot.assignment_id)"
+                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-blue-700 hover:bg-blue-50 transition-colors"
+                                                title="Change rider for this slot">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                            Change
+                                        </button>
+                                        <button type="button" @@click="openCancelModalById(slot.assignment_id)"
+                                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-rose-700 hover:bg-rose-50 transition-colors"
+                                                title="Cancel this slot">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Open slot: rider picker + warehouse + assign -->
+                            <template x-if="!slot.filled && !slot.unavailable">
+                                <div class="mt-3 space-y-3">
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Rider <span class="text-rose-500">*</span></label>
+                                        <div class="relative" @@click.outside="slot.open = false">
+                                            <input type="search" x-model="slot.search"
+                                                   @@focus="slot.open = true"
+                                                   @@input="slot.open = true; slot.activeIndex = -1; slot.driver_id = ''; slot.error = ''"
+                                                   @@keydown.arrow-down.prevent="moveSlotDriverFocus(slot, 1)"
+                                                   @@keydown.arrow-up.prevent="moveSlotDriverFocus(slot, -1)"
+                                                   @@keydown.enter.prevent="selectActiveSlotDriver(slot)"
+                                                   @@keydown.escape.stop.prevent="slot.open = false; slot.activeIndex = -1"
+                                                   role="combobox" aria-autocomplete="list" :aria-controls="`dispatch-slot-listbox-${slot.key}`"
+                                                   :aria-expanded="slot.open"
+                                                   :aria-activedescendant="slot.activeIndex >= 0 ? `dispatch-slot-option-${slot.key}-${slotDrivers(slot)[slot.activeIndex]?.id}` : null"
+                                                   placeholder="Search rider name, phone, vehicle..."
+                                                   class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                            <div x-show="slot.open" x-cloak class="absolute left-0 right-0 z-40 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                                <div :id="`dispatch-slot-listbox-${slot.key}`" role="listbox" aria-label="Pickup riders" class="max-h-56 overflow-y-auto">
+                                                    <template x-for="(driver, index) in slotDrivers(slot)" :key="driver.id">
+                                                        <button type="button" :id="`dispatch-slot-option-${slot.key}-${driver.id}`" role="option"
+                                                                :aria-selected="Number(slot.driver_id) === Number(driver.id)"
+                                                                @@mouseenter="slot.activeIndex = index" @@click="selectSlotDriver(slot, driver)"
+                                                                class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-3 text-left last:border-0 hover:bg-orange-50"
+                                                                :class="(Number(slot.driver_id) === Number(driver.id) || slot.activeIndex === index) ? 'bg-orange-50' : ''">
+                                                            <span class="min-w-0">
+                                                                <span class="block truncate text-sm font-bold text-slate-900" x-text="driver.name"></span>
+                                                                <span class="block truncate text-xs text-slate-500" x-text="[driver.phone, driver.vehicle_type, driver.vehicle_number].filter(Boolean).join(' · ')"></span>
+                                                                <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                                                      :class="driver.is_busy ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'"
+                                                                      x-text="driver.is_busy ? `Busy · ${driver.active_work_count} active jobs` : 'Available'"></span>
+                                                            </span>
+                                                            <span x-show="Number(slot.driver_id) === Number(driver.id)" class="text-lg font-bold text-orange-600">✓</span>
+                                                        </button>
+                                                    </template>
+                                                    <p x-show="slotDrivers(slot).length === 0" class="px-3 py-6 text-center text-sm text-slate-400">No matching riders.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Target Warehouse <span class="text-rose-500">*</span></label>
+                                        <select x-model="slot.target_warehouse_id" class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-xl bg-white text-sm text-slate-900 focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all">
+                                            <option value="">Choose warehouse...</option>
+                                            <template x-for="w in availableWarehouses" :key="w.id">
+                                                <option :value="w.id" x-text="w.name + (w.code ? ' (' + w.code + ')' : '')"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p x-show="slot.error" class="text-[11px] font-semibold text-rose-600" x-text="slot.error"></p>
+                                        </div>
+                                        <button type="button" @@click="assignSlot(slot)" :disabled="slot.saving"
+                                                class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all disabled:opacity-50 flex-shrink-0">
+                                            <svg x-show="slot.saving" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                            <span x-text="slot.saving ? 'Assigning...' : 'Assign'"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 border-t border-slate-200/50 px-6 py-4">
+                <button type="button" @@click="closeDispatchModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 transition-colors">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Edit Assignment Modal -->
 <div x-show="showEditModal" x-cloak class="fixed inset-0 z-[100] overflow-y-auto" @@keydown.escape.window="showEditModal = false">
