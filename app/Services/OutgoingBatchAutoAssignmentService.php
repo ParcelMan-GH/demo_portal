@@ -7,7 +7,6 @@ use App\Models\District;
 use App\Models\OutgoingBatch;
 use App\Models\OutgoingBatchAssignmentEvent;
 use App\Models\ShipmentItem;
-use App\Models\Warehouse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -36,7 +35,6 @@ class OutgoingBatchAutoAssignmentService
     public const DESTINATION_ITEM = 'parcel';
     public const DESTINATION_SHIPMENT = 'shipment';
     public const DESTINATION_DISTRICT_NAME = 'district_name';
-    public const DESTINATION_PRIMARY_HUB = 'primary_hub';
 
     /** Delivered or returned parcels are never moved back into a batch. */
     public const RESULT_NOT_ELIGIBLE = 'not_eligible';
@@ -120,38 +118,45 @@ class OutgoingBatchAutoAssignmentService
              */
             [$regionId, $districtId, $destinationSource] = $this->resolveDestination($locked);
 
-            if (empty($regionId)) {
+            /*
+             * Both are required, and the schema enforces it:
+             * `outgoing_batches.delivery_district_id` is NOT nullable, so a
+             * region-only "triage" batch cannot be represented. Rather than
+             * invent a district to satisfy a constraint — which would route a
+             * parcel to a place nobody chose — the parcel is left unbatched and
+             * the reason is named.
+             */
+            if (empty($regionId) || empty($districtId)) {
                 return $this->result(
                     self::RESULT_MISSING_DESTINATION,
                     null,
                     false,
-                    'Cannot auto-batch: this parcel is missing its Region or District routing information.'
+                    empty($regionId)
+                        ? 'Cannot auto-batch: this parcel has no delivery destination at all — no region, district or recognisable town. Set its destination so it can be routed.'
+                        : 'Cannot auto-batch: this parcel\'s destination region is known but its district is not, and a batch must name a district.'
                 );
             }
 
             /*
              * Write the routing back onto the parcel so the next attempt and
-             * every downstream screen agree on it.
-             *
-             * Skipped for the primary-hub fallback: that region is a triage
-             * guess, and stamping it on the parcel would make a guess look like
-             * data. The batch is still created; only the parcel is left honest.
+             * every downstream screen agree on it. Only ever fills blanks, and
+             * only with something derived from real data (the parcel's own
+             * fields, its shipment's, or a district name that matched) — never
+             * with a guess.
              */
-            if ($destinationSource !== self::DESTINATION_PRIMARY_HUB) {
-                $routing = [];
+            $routing = [];
 
-                if (empty($locked->delivery_region_id)) {
-                    $routing['delivery_region_id'] = $regionId;
-                }
+            if (empty($locked->delivery_region_id)) {
+                $routing['delivery_region_id'] = $regionId;
+            }
 
-                if (empty($locked->delivery_district_id) && ! empty($districtId)) {
-                    $routing['delivery_district_id'] = $districtId;
-                }
+            if (empty($locked->delivery_district_id)) {
+                $routing['delivery_district_id'] = $districtId;
+            }
 
-                if ($routing) {
-                    ShipmentItem::whereKey($locked->getKey())->update($routing);
-                    $locked->forceFill($routing);
-                }
+            if ($routing) {
+                ShipmentItem::whereKey($locked->getKey())->update($routing);
+                $locked->forceFill($routing);
             }
 
             $batch = OutgoingBatch::query()
@@ -228,17 +233,13 @@ class OutgoingBatchAutoAssignmentService
             // Keep the caller's instance in step with what was just written.
             $item->refresh();
 
-            $triage = $destinationSource === self::DESTINATION_PRIMARY_HUB
-                ? ' No destination on file — routed to the primary hub for sorting.'
-                : '';
-
             return $this->result(
                 $created ? self::RESULT_BATCH_CREATED : self::RESULT_BATCH_ATTACHED,
                 $batch,
                 $created,
-                ($created
+                $created
                     ? "New batch {$batch->batch_number} created for this destination."
-                    : "Added to open batch {$batch->batch_number}.").$triage
+                    : "Added to open batch {$batch->batch_number}."
             );
         });
     }
@@ -306,16 +307,14 @@ class OutgoingBatchAutoAssignmentService
             }
         }
 
-        $primary = Warehouse::query()
-            ->where('is_active', true)
-            ->orderByDesc('is_hq')
-            ->orderBy('id')
-            ->first();
-
-        if ($primary && ! empty($primary->region_id)) {
-            return [(int) $primary->region_id, null, self::DESTINATION_PRIMARY_HUB];
-        }
-
+        /*
+         * No primary-hub fallback. It was the obvious next step, but
+         * `outgoing_batches.delivery_district_id` is not nullable, so a
+         * district-less batch cannot be created — and picking an arbitrary
+         * district in the hub's region would send the parcel somewhere nobody
+         * chose. The unresolved case is reported instead, and the caller can see
+         * exactly which branch failed from `destination_source`.
+         */
         return [null, null, null];
     }
 
