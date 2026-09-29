@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\ProfilePhotoService;
 use App\Services\UserProfileService;
+use App\Support\PhoneNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The signed-in user's own profile, whatever app they signed in through.
@@ -40,5 +44,43 @@ class UserProfileController extends Controller
         return response()->json(
             $this->service->updatePhoto($request->user(), $request->file('photo'))
         );
+    }
+
+    /**
+     * Update the details the agent maintains about themselves.
+     *
+     * POST rather than PATCH so a client can send this as multipart alongside a
+     * photo if it ever needs both in one trip.
+     */
+    public function update(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:32'],
+            'email' => [
+                'nullable', 'email', 'max:255',
+                Rule::unique('users', 'email')->ignore($user->getKey()),
+            ],
+        ]);
+
+        // A plain `unique` rule cannot see across the two shapes the phone column
+        // holds, so duplicates are checked through the same normaliser the login
+        // uses. Without it, `024...` and `+233...` could be taken by two accounts
+        // and the phone login would resolve ambiguously.
+        if (! blank($validated['phone'] ?? null)) {
+            $taken = PhoneNumber::match(User::query(), (string) $validated['phone'])
+                ->whereKeyNot($user->getKey())
+                ->exists();
+
+            if ($taken) {
+                throw ValidationException::withMessages([
+                    'phone' => 'That phone number already belongs to another account.',
+                ]);
+            }
+        }
+
+        return response()->json($this->service->update($user, $validated));
     }
 }

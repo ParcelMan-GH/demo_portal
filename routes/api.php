@@ -108,6 +108,9 @@ Route::prefix('v1/hub')->group(function () {
 Route::prefix('v1/user')->middleware('auth:sanctum')->group(function () {
     Route::get('me', [UserProfileController::class, 'me']);
     Route::post('profile-photo', [UserProfileController::class, 'updatePhoto']);
+    // Name / phone / email. Separate from the photo so an agent can save details
+    // without re-uploading an image, and the photo without touching their name.
+    Route::post('profile', [UserProfileController::class, 'update']);
 });
 
 Route::prefix('v1/agent')->middleware(['auth:sanctum'])->group(function () {

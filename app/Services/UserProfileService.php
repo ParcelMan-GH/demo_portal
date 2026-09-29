@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\PhoneNumber;
 use Illuminate\Http\UploadedFile;
 
 /**
@@ -78,6 +79,39 @@ class UserProfileService
             'success' => true,
             'message' => 'Profile retrieved successfully.',
             'data' => ['user' => $this->formatUser($user)],
+        ];
+    }
+
+    /**
+     * Update the parts of the profile the agent maintains about themselves.
+     *
+     * A phone change is normalised on the way in. The column already holds two
+     * shapes, and letting the app add a third would make the phone login this
+     * same release introduces less reliable over time, not more.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    public function update(User $user, array $attributes): array
+    {
+        if (array_key_exists('name', $attributes)) {
+            $user->name = $attributes['name'];
+        }
+
+        if (array_key_exists('phone', $attributes)) {
+            $user->phone = PhoneNumber::normalise($attributes['phone']);
+        }
+
+        if (array_key_exists('email', $attributes)) {
+            $user->email = $attributes['email'];
+        }
+
+        $user->save();
+
+        return [
+            'success' => true,
+            'message' => 'Profile updated.',
+            'data' => ['user' => $this->formatUser($user->fresh())],
         ];
     }
 }
