@@ -71,9 +71,38 @@ class AgentParcelController extends Controller
             ->latest()
             ->get();
 
+        /*
+         * Rows are shaped for the agent app, which reads `recipient_name`,
+         * `recipient_phone` and `town`.
+         *
+         * This returned the raw shipment_items records, whose columns are named
+         * `delivery_recipient_name`, `delivery_recipient_phone` and
+         * `delivery_town` — so every claimed parcel rendered as "Unknown
+         * Recipient / No phone provided / No address specified" while the data
+         * sat right there in the payload under other names.
+         *
+         * The original columns are kept alongside the aliases so nothing that
+         * already reads this payload loses a field. `status` is deliberately
+         * left as the raw slug: the app both filters on it (`picked_up` /
+         * `pending` / `rescheduled`) and renders it, so prettifying it here
+         * would empty the tabs.
+         */
         return response()->json([
             'success' => true,
-            'data' => $parcels,
+            'data' => $parcels->map(fn (ShipmentItem $parcel) => array_merge(
+                $parcel->toArray(),
+                [
+                    'id' => $parcel->id,
+                    'tracking_code' => $parcel->tracking_code,
+                    'recipient_name' => $parcel->delivery_recipient_name,
+                    'recipient_phone' => $parcel->delivery_recipient_phone,
+                    'town' => $parcel->delivery_town,
+                    'address' => $parcel->delivery_gh_post_address,
+                    'items_count' => (int) ($parcel->quantity ?? 1),
+                    'total_fee' => (float) ($parcel->delivery_fee ?? 0),
+                    'claimed_at' => optional($parcel->updated_at)->toIso8601String(),
+                ]
+            ))->values(),
         ]);
     }
 
