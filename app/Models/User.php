@@ -35,6 +35,25 @@ class User extends Authenticatable
         'created_by_user_id',
         'warehouse_id',
         'fcm_token',
+        'payout_method',
+        'payout_momo_network',
+        'payout_bank_name',
+        'payout_account_name',
+        'payout_account_number',
+        'payout_account_updated_at',
+    ];
+
+    /**
+     * Only the payout timestamp is cast. This model's other date columns are read
+     * as raw strings today, and casting them here would change behaviour in code
+     * that is not part of this change.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        // Without this the column reads back as a string, and formatting it into
+        // the API response throws "toISOString() on string".
+        'payout_account_updated_at' => 'datetime',
     ];
 
     /**
