@@ -159,6 +159,47 @@ class AgentParcelController extends Controller
                     ->where('outcome', AgentCallLog::OUTCOME_RESCHEDULED)
                     ->whereDate('created_at', today())
                     ->count(),
+
+                /*
+                 * The four tiles the Home screen actually renders.
+                 *
+                 * It reads `today_commission`, `customers_called`, `amount_paid`
+                 * and `unable_to_reach`, and this endpoint returned none of them.
+                 * The keys above are named differently — `claimed_today`,
+                 * `pending_calls`, `rescheduled` — so nothing matched and every
+                 * tile fell back to its zero default. The dashboard was not
+                 * showing a wrong number, it was showing no number at all.
+                 *
+                 * Each is computed from this agent's own rows, so one agent can
+                 * never see another's figures.
+                 */
+                'amount_paid' => (float) AgentCallLog::where('agent_id', $agent->id)
+                    ->where('outcome', AgentCallLog::OUTCOME_CONFIRMED)
+                    ->sum('amount_paid'),
+
+                /*
+                 * Every call this agent has logged, not just today's: the brief
+                 * asks for the total of what they have collected, so this reads
+                 * the whole history rather than a window. (The Home screen has a
+                 * Today/Week/Month picker that the API does not read yet — see the
+                 * note in the report.)
+                 */
+                'customers_called' => AgentCallLog::where('agent_id', $agent->id)->count(),
+
+                'unable_to_reach' => AgentCallLog::where('agent_id', $agent->id)
+                    ->where('outcome', AgentCallLog::OUTCOME_UNREACHABLE)
+                    ->count(),
+
+                /*
+                 * Today's commission, resolved the way the ledger and the
+                 * earnings endpoint resolve it. The stored column is not trusted
+                 * alone because a band can change after the row was written.
+                 */
+                'today_commission' => (float) (CommissionTier::findTierForAmount(
+                    (float) (AgentDailyQuota::where('user_id', $agent->id)
+                        ->whereDate('tracking_date', today())
+                        ->value('collected_amount') ?? 0.0)
+                )?->payout_amount ?? 0.0),
             ]
         ]);
     }
