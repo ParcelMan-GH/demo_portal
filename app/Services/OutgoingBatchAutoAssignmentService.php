@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Enums\ItemStatus;
+use App\Models\District;
 use App\Models\OutgoingBatch;
 use App\Models\OutgoingBatchAssignmentEvent;
 use App\Models\ShipmentItem;
+use App\Models\Warehouse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -29,6 +31,12 @@ class OutgoingBatchAutoAssignmentService
 
     /** Region or district is missing, so there is no destination to batch to. */
     public const RESULT_MISSING_DESTINATION = 'missing_destination';
+
+    /** Where a parcel's destination was resolved from. */
+    public const DESTINATION_ITEM = 'parcel';
+    public const DESTINATION_SHIPMENT = 'shipment';
+    public const DESTINATION_DISTRICT_NAME = 'district_name';
+    public const DESTINATION_PRIMARY_HUB = 'primary_hub';
 
     /** Delivered or returned parcels are never moved back into a batch. */
     public const RESULT_NOT_ELIGIBLE = 'not_eligible';
@@ -66,7 +74,20 @@ class OutgoingBatchAutoAssignmentService
             if ($locked->outgoing_batch_id) {
                 $existing = OutgoingBatch::query()->find($locked->outgoing_batch_id);
 
-                if ($existing) {
+                /*
+                 * Only an *open* batch counts as "already batched".
+                 *
+                 * A closed batch — dispatched, received, in transit — has already
+                 * left the building, so a parcel still pointing at one can never
+                 * be collected by it. Treating that as done stranded such parcels:
+                 * they held an outgoing_batch_id, so every later attempt
+                 * short-circuited here and they never reached an open batch. That
+                 * is exactly the state PM-Y7AWOERH was in.
+                 *
+                 * The previous batch is recorded on the assignment event
+                 * (`previous_batch_id`), so the move stays traceable.
+                 */
+                if ($existing && $existing->isOpen()) {
                     return $this->result(
                         self::RESULT_ALREADY_BATCHED,
                         $existing,
@@ -89,16 +110,48 @@ class OutgoingBatchAutoAssignmentService
                 );
             }
 
-            $regionId = $locked->delivery_region_id;
-            $districtId = $locked->delivery_district_id;
+            /*
+             * Resolve a destination before giving up.
+             *
+             * 48 of the 64 parcels in this database carry no region or district,
+             * and a confirmed parcel with no destination was abandoned right
+             * here — so no batch ever collected it. The routing is recorded in
+             * three places and only the parcel's own row was ever consulted.
+             */
+            [$regionId, $districtId, $destinationSource] = $this->resolveDestination($locked);
 
-            if (empty($regionId) || empty($districtId)) {
+            if (empty($regionId)) {
                 return $this->result(
                     self::RESULT_MISSING_DESTINATION,
                     null,
                     false,
                     'Cannot auto-batch: this parcel is missing its Region or District routing information.'
                 );
+            }
+
+            /*
+             * Write the routing back onto the parcel so the next attempt and
+             * every downstream screen agree on it.
+             *
+             * Skipped for the primary-hub fallback: that region is a triage
+             * guess, and stamping it on the parcel would make a guess look like
+             * data. The batch is still created; only the parcel is left honest.
+             */
+            if ($destinationSource !== self::DESTINATION_PRIMARY_HUB) {
+                $routing = [];
+
+                if (empty($locked->delivery_region_id)) {
+                    $routing['delivery_region_id'] = $regionId;
+                }
+
+                if (empty($locked->delivery_district_id) && ! empty($districtId)) {
+                    $routing['delivery_district_id'] = $districtId;
+                }
+
+                if ($routing) {
+                    ShipmentItem::whereKey($locked->getKey())->update($routing);
+                    $locked->forceFill($routing);
+                }
             }
 
             $batch = OutgoingBatch::query()
@@ -166,25 +219,105 @@ class OutgoingBatchAutoAssignmentService
                     'batch_number' => $batch->batch_number,
                     'previous_status' => $status,
                     'previous_batch_id' => $item->outgoing_batch_id,
+                    // Recorded so a triage-routed parcel can be told apart from
+                    // one that knew where it was going.
+                    'destination_source' => $destinationSource,
                 ],
             ]);
 
             // Keep the caller's instance in step with what was just written.
             $item->refresh();
 
+            $triage = $destinationSource === self::DESTINATION_PRIMARY_HUB
+                ? ' No destination on file — routed to the primary hub for sorting.'
+                : '';
+
             return $this->result(
                 $created ? self::RESULT_BATCH_CREATED : self::RESULT_BATCH_ATTACHED,
                 $batch,
                 $created,
-                $created
+                ($created
                     ? "New batch {$batch->batch_number} created for this destination."
-                    : "Added to open batch {$batch->batch_number}."
+                    : "Added to open batch {$batch->batch_number}.").$triage
             );
         });
     }
 
     // Batch numbering moved to OutgoingBatch::generateBatchNumber() so the two
     // places that create batches cannot drift apart.
+
+    /**
+     * The destination to batch this parcel under, and where that came from.
+     *
+     * Tried in order of how much the source can be trusted:
+     *
+     *  1. the parcel's own routing fields;
+     *  2. its shipment's — the same column names, and the shipment is often
+     *     filled in when the item row was never backfilled;
+     *  3. a district matched by name from the town. This catches "Kumasi" and
+     *     "Accra" but not "Aburi", because districts are named for municipal
+     *     assemblies rather than towns;
+     *  4. the primary hub. A last resort, and a deliberate one: a parcel that
+     *     reaches a hub it can be re-sorted from is better than a confirmed
+     *     parcel no batch will ever collect. The caller must not stamp this
+     *     region onto the parcel as though it were known.
+     *
+     * @return array{0: ?int, 1: ?int, 2: ?string}
+     */
+    private function resolveDestination(ShipmentItem $item): array
+    {
+        if (! empty($item->delivery_region_id)) {
+            return [
+                (int) $item->delivery_region_id,
+                $item->delivery_district_id ? (int) $item->delivery_district_id : null,
+                self::DESTINATION_ITEM,
+            ];
+        }
+
+        $shipment = $item->shipment;
+
+        if ($shipment && ! empty($shipment->delivery_region_id)) {
+            return [
+                (int) $shipment->delivery_region_id,
+                $shipment->delivery_district_id ? (int) $shipment->delivery_district_id : null,
+                self::DESTINATION_SHIPMENT,
+            ];
+        }
+
+        foreach ([$item->delivery_town, $shipment?->delivery_town] as $town) {
+            $town = trim((string) $town);
+
+            if ($town === '') {
+                continue;
+            }
+
+            $district = District::query()
+                ->where('is_active', true)
+                ->where('name', 'like', $town.'%')
+                ->orderBy('id')
+                ->first();
+
+            if ($district && ! empty($district->region_id)) {
+                return [
+                    (int) $district->region_id,
+                    (int) $district->id,
+                    self::DESTINATION_DISTRICT_NAME,
+                ];
+            }
+        }
+
+        $primary = Warehouse::query()
+            ->where('is_active', true)
+            ->orderByDesc('is_hq')
+            ->orderBy('id')
+            ->first();
+
+        if ($primary && ! empty($primary->region_id)) {
+            return [(int) $primary->region_id, null, self::DESTINATION_PRIMARY_HUB];
+        }
+
+        return [null, null, null];
+    }
 
     /**
      * @return array{result: string, batch: ?OutgoingBatch, created: bool, message: string}
