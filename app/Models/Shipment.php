@@ -306,9 +306,30 @@ class Shipment extends Model
             ? $this->pickupAssignments
             : $this->pickupAssignments()->get();
 
-        return $assignments
-            ->filter(fn (PickupAssignment $assignment) => $assignment->status !== PickupAssignmentStatus::CANCELLED)
-            ->count();
+        $live = $assignments
+            ->filter(fn (PickupAssignment $assignment) => $assignment->status !== PickupAssignmentStatus::CANCELLED);
+
+        /*
+         * No vehicle was ever requested, so there are no slots to fill: any live
+         * rider completes it. This is the historical case and must keep behaving
+         * as it always has.
+         */
+        if ($this->pickupRequiredSlotCount() === 0) {
+            return $live->count();
+        }
+
+        /*
+         * Only assignments that actually claim a slot count towards the request.
+         *
+         * Counting every live rider instead was wrong in a way that mattered: an
+         * assignment carrying no vehicle type (the legacy flow, and anything
+         * created before slots existed) padded the total, so a shipment that asked
+         * for 2 Motorbike + 1 Aboboyaa could report FULLY_ASSIGNED while the
+         * breakdown still showed one Motorbike slot unfilled. Two riders are not
+         * two motorbikes, and a rider who is not on the requested vehicle cannot
+         * carry its load — which is the whole reason the request names a type.
+         */
+        return $live->whereNotNull('pickup_vehicle_type_id')->count();
     }
 
     /**
