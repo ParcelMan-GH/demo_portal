@@ -112,6 +112,31 @@ class PushNotificationService
     }
 
     /**
+     * Send to every user holding a given role.
+     *
+     * The narrow alternative to sendToAllAdmins(), which reaches every token holder
+     * regardless of what they do. Vendor chat used that and notified warehouse
+     * staff for every message.
+     */
+    public function sendToRole(string $roleSlug, string $title, string $body, array $data = [], string $type = 'general'): int
+    {
+        $users = User::whereNotNull('fcm_token')
+            ->where('fcm_token', '!=', '')
+            ->whereHas('roles', fn ($q) => $q->where('slug', $roleSlug))
+            ->get();
+
+        $count = 0;
+
+        foreach ($users as $user) {
+            if ($this->sendToAdmin($user, $title, $body, $data, $type)) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
      * Send to HQ warehouse users only.
      */
     public function sendToSuperAdmins(string $title, string $body, array $data = [], string $type = 'general'): int

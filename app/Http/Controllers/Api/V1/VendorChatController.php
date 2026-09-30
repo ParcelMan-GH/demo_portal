@@ -24,6 +24,16 @@ class VendorChatController extends Controller
     /** Messages per page. The app scrolls back, so this is a window, not a cap. */
     private const PER_PAGE = 50;
 
+    /**
+     * Who hears about a vendor message: the Admin role.
+     *
+     * There is no 'support' role in this system; `contact_agent` is the nearest
+     * thing but it covers outside parties rather than the support inbox, so this is
+     * the Admin role alone. Name it in one place so widening the audience later is
+     * a one-line change.
+     */
+    private const CHAT_ALERT_ROLE = 'admin';
+
     public function __construct(private PushNotificationService $push) {}
 
     public function show(Request $request): JsonResponse
@@ -160,9 +170,10 @@ class VendorChatController extends Controller
          * committed, and an undelivered push is a missed notification rather than a
          * lost message, since it is still in the thread.
          *
-         * `sendToAllAdmins()` records an in-app row even for a recipient with no
-         * FCM token, so support still finds it in the portal inbox. It matches the
-         * existing recipient rule for other vendor-initiated alerts.
+         * Goes to the Admin role rather than every token holder: sendToAllAdmins()
+         * also reached warehouse staff, who do not handle vendor support, so each
+         * message rang phones that had no reason to act on it. The role is named
+         * here so the audience is one line to change.
          */
         try {
             $preview = $validated['message'] ?? null;
@@ -171,7 +182,8 @@ class VendorChatController extends Controller
                 ? mb_strimwidth($preview, 0, 120, '…')
                 : ($attachmentType === 'audio' ? 'Sent a voice note' : 'Sent a photo');
 
-            $this->push->sendToAllAdmins(
+            $this->push->sendToRole(
+                self::CHAT_ALERT_ROLE,
                 title: 'New message from ' . ($vendor->business_name ?: $vendor->name),
                 body: $body,
                 data: [
