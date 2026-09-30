@@ -230,6 +230,9 @@ class DeliveryRunController extends Controller
             'data' => $this->sortingService->mapEligibleItems($rows),
             'meta' => [
                 'total' => $total,
+                // Both were computed and then thrown away; the view reads them.
+                'needs_followup' => $needsFollowup,
+                'pending_recent' => $under24h,
                 'per_page' => $perPage,
                 'current_page' => $page,
                 'last_page' => (int) ceil($total / $perPage) ?: 1,
@@ -805,6 +808,26 @@ class DeliveryRunController extends Controller
         $needsFollowup = (clone $summaryQuery)
             ->whereNotNull('handoff_at')
             ->where('handoff_at', '<=', now()->subHours(24))
+            ->count();
+
+        /*
+         * The complement of `$needsFollowup`, and it was missing entirely.
+         *
+         * The view has always bound three tiles — `meta.total`,
+         * `meta.needs_followup` and `meta.pending_recent` — but this method only
+         * ever returned `total`. Two of the three keys never existed, so the view
+         * fell back to its `|| 0` and rendered NEEDS FOLLOW-UP and UNDER 24H as a
+         * permanent 0 however much data sat behind them. A zero that is always
+         * zero reads as "no work" rather than "not wired", which is what made
+         * this look like an empty-query bug.
+         *
+         * Mirrors the `followup=recent` filter above so the tile and the filter
+         * that drills into it can never disagree.
+         */
+        $under24h = (clone $summaryQuery)
+            ->where(function ($q) {
+                $q->whereNull('handoff_at')->orWhere('handoff_at', '>', now()->subHours(24));
+            })
             ->count();
         $perPage = min((int) $request->get('per_page', 20), 100);
         $page = max((int) $request->get('page', 1), 1);
