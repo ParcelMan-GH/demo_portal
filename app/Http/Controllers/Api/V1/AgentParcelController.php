@@ -744,6 +744,19 @@ class AgentParcelController extends Controller
             'data' => [
                 'available_balance' => $this->formatMoney($availableBalance),
                 'total_earned' => $this->formatMoney($totalEarned),
+
+                /*
+                 * Same flag the overview carries, from the same conditions. The
+                 * ledger must agree with Home about whether the agent has work
+                 * outstanding: a locked dashboard beside an open ledger (or the
+                 * reverse) reads as a bug rather than as a rule.
+                 */
+                'pending_tasks_count' => $ledgerPending = ShipmentItem::where('agent_id', $agent->id)
+                    ->where('status', ItemStatus::PICKED_UP)
+                    ->whereDoesntHave('agentCallLogs', fn ($query) => $query->where('agent_id', $agent->id))
+                    ->count(),
+                'has_remaining_tasks' => $ledgerPending > 0,
+
                 'activities' => $activities,
             ],
         ]);
