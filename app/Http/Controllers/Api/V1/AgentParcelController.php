@@ -118,8 +118,47 @@ class AgentParcelController extends Controller
          * `pending` / `rescheduled`) and renders it, so prettifying it here
          * would empty the tabs.
          */
+        /*
+         * The queue screen's headline figures, counted server-side.
+         *
+         * Deliberately a top-level `summary`, not a key inside `data`: the app
+         * reads `data` as the array of parcels (`data.queue || data.data`), so
+         * turning `data` into an object would empty the list.
+         *
+         * These are counted here for two reasons. A list can only report what it
+         * holds, and one of these numbers cannot be derived from it at all:
+         * already-called parcels are excluded from this query, so a
+         * "rescheduled" count taken from the list is structurally always 0 —
+         * which is exactly what the screen has been showing. And scoping all
+         * three to *this agent, today* keeps them consistent with each other and
+         * with the working day the agent is actually being paid for.
+         */
+        $todayLogs = fn () => AgentCallLog::query()
+            ->where('agent_id', $agent->id)
+            ->whereDate('created_at', today());
+
+        $summary = [
+            // Parcels still waiting for a call: exactly this list.
+            'pending_calls' => $parcels->count(),
+            'rescheduled_today' => $todayLogs()
+                ->where('outcome', AgentCallLog::OUTCOME_RESCHEDULED)
+                ->count(),
+            /*
+             * Clients who actually paid today. Counted from a positive
+             * `amount_paid` rather than the `confirmed` outcome, because the
+             * money is the fact being reported — a confirmed log with no
+             * readable amount moved nothing and must not inflate this.
+             */
+            'paid_today' => $todayLogs()
+                ->whereNotNull('amount_paid')
+                ->where('amount_paid', '>', 0)
+                ->count(),
+            'collected_today' => (float) $todayLogs()->sum('amount_paid'),
+        ];
+
         return response()->json([
             'success' => true,
+            'summary' => $summary,
             'data' => $parcels->map(fn (ShipmentItem $parcel) => array_merge(
                 $parcel->toArray(),
                 [
@@ -198,6 +237,22 @@ class AgentParcelController extends Controller
 
                 'unable_to_reach' => AgentCallLog::where('agent_id', $agent->id)
                     ->where('outcome', AgentCallLog::OUTCOME_UNREACHABLE)
+                    ->count(),
+
+                /*
+                 * How many clients have actually paid this agent — the same
+                 * question `callHistory()`'s `paid` answers, so the two screens
+                 * can never disagree. Counted from a positive `amount_paid`
+                 * rather than the `confirmed` outcome because the money is the
+                 * fact, and a confirmed log with an unreadable amount moved none.
+                 *
+                 * `amount_paid` above reports what was collected; this reports how
+                 * many clients it came from, which is the number an agent
+                 * comparing their day against a target actually wants.
+                 */
+                'paid_clients' => AgentCallLog::where('agent_id', $agent->id)
+                    ->whereNotNull('amount_paid')
+                    ->where('amount_paid', '>', 0)
                     ->count(),
 
                 /*
@@ -534,10 +589,48 @@ class AgentParcelController extends Controller
             return $log;
         });
 
+        /*
+         * The Call Log's summary cards, counted over the agent's WHOLE history
+         * rather than over the page just returned.
+         *
+         * The screen derived these itself from whatever rows it had fetched, so
+         * with a 25-per-page limit a 26th paid client was invisible and the
+         * counts drifted lower the further back the agent looked. A headline
+         * figure has to be an all-time total or it is simply wrong.
+         *
+         * `paid` is counted from a positive `amount_paid`, not from the
+         * `confirmed` outcome: the money is the fact being shown, and a confirmed
+         * log whose amount could not be read moved nothing. `successful` and
+         * `failed` keep their existing meaning for the cards already on screen.
+         */
+        $totals = AgentCallLog::query()
+            ->where('agent_id', $agent->id)
+            ->selectRaw('count(*) as total')
+            ->selectRaw("sum(case when outcome = ? then 1 else 0 end) as successful", [AgentCallLog::OUTCOME_CONFIRMED])
+            ->selectRaw(
+                'sum(case when outcome in (?, ?) then 1 else 0 end) as failed',
+                [AgentCallLog::OUTCOME_UNREACHABLE, AgentCallLog::OUTCOME_CANCELLED]
+            )
+            ->selectRaw("sum(case when outcome = ? then 1 else 0 end) as rescheduled", [AgentCallLog::OUTCOME_RESCHEDULED])
+            ->selectRaw('sum(case when amount_paid is not null and amount_paid > 0 then 1 else 0 end) as paid')
+            ->selectRaw('sum(case when amount_paid is not null and amount_paid > 0 then amount_paid else 0 end) as collected')
+            ->first();
+
+        $summary = [
+            'paid' => (int) ($totals->paid ?? 0),
+            'successful' => (int) ($totals->successful ?? 0),
+            'failed' => (int) ($totals->failed ?? 0),
+            'rescheduled' => (int) ($totals->rescheduled ?? 0),
+            'total' => (int) ($totals->total ?? 0),
+            'collected' => (float) ($totals->collected ?? 0),
+            'collected_label' => $this->formatMoney((float) ($totals->collected ?? 0)),
+        ];
+
         return response()->json([
             'success' => true,
             'data' => [
                 'call_logs' => $rows,
+                'summary' => $summary,
                 'pagination' => [
                     'current_page' => $logs->currentPage(),
                     'per_page' => $logs->perPage(),
