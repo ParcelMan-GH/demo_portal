@@ -511,10 +511,28 @@ class HubController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $hub = $request->user()->warehouse;
+        $user = $request->user();
+        $hub = $user->warehouse;
         $perPage = (int) ($validated['per_page'] ?? 30);
 
-        $query = ShipmentItem::query()->atHub($hub->id);
+        /*
+         * Scoped to the signed-in agent: only parcels they were assigned or have
+         * handled, rather than everything standing at the hub.
+         *
+         * This follows the "Recent Work" decision, and the two are consistent —
+         * the feed lists what the agent did, this lists what they still hold.
+         *
+         * Worth knowing before relying on it at a counter: of the 39 parcels at
+         * this deployment's busiest hub, the agent who made the most recent
+         * intakes is left with 2. A colleague who takes a parcel in is the only
+         * one who will see it here, which is fine for a personal worklist and a
+         * problem if the screen is being used to look up any parcel a customer
+         * arrives for. The hub-wide counts on Home are unchanged and remain the
+         * place to answer "is it here at all".
+         */
+        $query = ShipmentItem::query()
+            ->atHub($hub->id)
+            ->handledBy((int) $user->id);
 
         $statuses = $this->statusesFromFilter($validated['status'] ?? null);
 
@@ -557,7 +575,12 @@ class HubController extends Controller
             'data' => [
                 'hub' => $this->serializeHub($hub),
                 'packages' => $this->serializePackages($packages->getCollection(), $hub),
-                'counts' => $this->hubCounts($hub),
+                // Scoped like the list above, so the screen's counters describe
+                // the agent's own parcels and cannot disagree with what is shown.
+                'counts' => $this->hubCounts($hub, (int) $user->id),
+                // Says so explicitly, so the app can label the screen as personal
+                // rather than leaving an agent to wonder where the rest went.
+                'scope' => 'agent',
                 'pagination' => [
                     'current_page' => $packages->currentPage(),
                     'per_page' => $packages->perPage(),
@@ -1090,9 +1113,25 @@ class HubController extends Controller
     /**
      * @return array<string, int>
      */
-    private function hubCounts(Warehouse $hub): array
+    /**
+     * Inventory counts for a hub, optionally narrowed to one agent.
+     *
+     * `$actorId` is null for the dashboard tiles, which stay hub-wide on purpose:
+     * "what is standing at my station" is not a personal figure, and the agent
+     * needs it whether or not they were the one who took the parcel in.
+     *
+     * The Inventory screen passes the signed-in agent, so its counters describe
+     * that agent's own parcels and agree with the list beneath them. Two different
+     * numbers from one function, which is why the scope is a parameter rather than
+     * a second copy of these queries.
+     */
+    private function hubCounts(Warehouse $hub, ?int $actorId = null): array
     {
         $base = ShipmentItem::query()->atHub($hub->id);
+
+        if ($actorId !== null) {
+            $base->handledBy($actorId);
+        }
 
         // Parcels assigned to a different hub and still waiting to go. Deliberately
         // not the dispatched count — see ShipmentItem::scopeWaitingBus().

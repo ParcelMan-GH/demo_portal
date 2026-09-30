@@ -121,6 +121,51 @@ class ShipmentItem extends Model
     }
 
     /**
+     * Parcels this agent is responsible for: assigned to them, or handled by them.
+     *
+     * Two signals, because neither alone covers it:
+     *
+     *   - `agent_id` — an explicit assignment. Note this column is sparsely used
+     *     (8 non-null rows on this deployment) and historically means the *pickup*
+     *     agent rather than the hub handler, so on its own it would miss nearly
+     *     every parcel a hub agent has actually worked.
+     *   - a tracking row written by this agent — the real record of who checked the
+     *     parcel in, sorted it or dispatched it. This is what makes the scope mean
+     *     "I handled it".
+     *
+     * Matching goes through {@see ShipmentItemTracking::actorValues()} so the
+     * `user:{id}` / bare `{id}` formats live in one place. `driver:{id}` is excluded
+     * there for the same reason as the hub feed: a driver id is a different
+     * principal namespace.
+     *
+     * An unresolvable actor matches nothing rather than everything — the failure
+     * mode of a scope like this must never be "show the whole warehouse".
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<ShipmentItem>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<ShipmentItem>
+     */
+    public function scopeHandledBy($query, int|string|null $userId)
+    {
+        $values = ShipmentItemTracking::actorValues($userId);
+
+        if ($values === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $tracking = (new ShipmentItemTracking)->getTable();
+
+        return $query->where(function ($inner) use ($userId, $values, $tracking) {
+            $inner->where($this->qualifyColumn('agent_id'), $userId)
+                ->orWhereExists(function ($sub) use ($values, $tracking) {
+                    $sub->selectRaw('1')
+                        ->from($tracking)
+                        ->whereColumn("{$tracking}.shipment_item_id", $this->qualifyColumn('id'))
+                        ->whereIn("{$tracking}.created_by", $values);
+                });
+        });
+    }
+
+    /**
      * The complement of `scopeAtHub()`: parcels that are not at this hub.
      *
      * Written out rather than negated in SQL because `hub_id != ?` is NULL-unsafe
