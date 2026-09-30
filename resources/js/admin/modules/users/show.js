@@ -483,6 +483,19 @@ document.addEventListener('alpine:init', () => {
             return true;
         },
 
+        /**
+         * The CSRF token, preferring the live meta tag over the boot-time config.
+         *
+         * The config snapshot is fine for a page opened and used immediately, and
+         * stale for one left open until the session rolled over — which is exactly
+         * when a 419 shows up and looks inexplicable.
+         */
+        freshCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+
+            return (meta && meta.getAttribute('content')) || this.config.csrfToken || '';
+        },
+
         async submitForm() {
             this.submitting = true;
             this.formErrors = {};
@@ -508,17 +521,35 @@ document.addEventListener('alpine:init', () => {
                     body.append('profile_photo', this.formData.photo);
                 }
 
+                /*
+                 * The token is read fresh from the meta tag rather than trusting
+                 * the config snapshot taken when the page was booted: on a long-
+                 * lived page that snapshot is exactly what goes stale.
+                 *
+                 * `_token` is also set, because this body is multipart when a
+                 * profile photo is attached and multipart is where a dropped
+                 * header hurts most.
+                 */
+                body.set('_token', this.freshCsrfToken());
+
                 const response = await fetch(this.config.updateEndpoint, {
                     method: 'POST',
                     headers: {
                         Accept: 'application/json',
-                        'X-CSRF-TOKEN': this.config.csrfToken,
+                        'X-CSRF-TOKEN': this.freshCsrfToken(),
                         'X-Requested-With': 'XMLHttpRequest',
                     },
                     body,
                 });
 
                 const result = await response.json().catch(() => ({}));
+
+                if (response.status === 419) {
+                    // Keep the form as-is so a retry does not mean retyping.
+                    this.formErrors.general = 'Your session expired, so this was not saved. Nothing has changed — please try again.';
+                    return;
+                }
+
                 if (!response.ok) {
                     if (response.status === 422 && result.errors) {
                         Object.entries(result.errors).forEach(([key, messages]) => {
