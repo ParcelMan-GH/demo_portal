@@ -154,8 +154,12 @@ class HubController extends Controller
                 ],
                 // Retained in the shape the hub screens already read.
                 'counts' => $counts,
-                // Newest first, empty for an account that has done nothing yet.
-                'recent_activities' => $this->recentActivities($hub, 8),
+                /*
+                 * Newest first, and empty for an account that has done nothing
+                 * yet — now actually true. Scoped to this user's own work; the
+                 * tiles above stay hub-wide on purpose.
+                 */
+                'recent_activities' => $this->recentActivities((int) $user->id, 8),
             ],
         ]);
     }
@@ -906,29 +910,30 @@ class HubController extends Controller
     }
 
     /**
-     * The hub's most recent movement, newest first.
+     * The signed-in agent's most recent work, newest first.
      *
-     * Derived from the tracking rows already written for the hub's parcels, so
-     * the feed reflects what actually happened rather than a parallel log that
-     * could drift. An account that has done nothing yet gets an empty array,
-     * which the app renders as an empty state.
+     * Derived from the tracking rows already written, so the feed reflects what
+     * actually happened rather than a parallel log that could drift. A new
+     * account gets an empty array, which the app renders as an empty state.
+     *
+     * Scoped to the acting user, and NOT to the hub — see the body for why the
+     * old hub-wide version was wrong and why the `atHub` restriction had to go
+     * with it. The stat tiles remain hub-wide.
      *
      * @return array<int, array<string, mixed>>
      */
-    private function recentActivities(Warehouse $hub, int $limit): array
+    private function recentActivities(?int $actorId, int $limit): array
     {
-        $itemIds = ShipmentItem::query()->atHub($hub->id)->pluck('id');
-
-        if ($itemIds->isEmpty()) {
-            return [];
-        }
-
         $rows = ShipmentItemTracking::query()
-            ->whereIn('shipment_item_id', $itemIds)
+            ->whereActor($actorId)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($limit)
             ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
 
         $codes = ShipmentItem::query()
             ->whereIn('id', $rows->pluck('shipment_item_id')->unique())
