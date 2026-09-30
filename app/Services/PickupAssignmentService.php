@@ -33,7 +33,13 @@ class PickupAssignmentService
      * $pickupVehicleTypeId is optional and stays optional on purpose: when it is
      * null this behaves exactly as it always has — one more rider, no slot — so
      * every existing caller is untouched. When it is given, the assignment
-     * claims the next free slot of that requested vehicle type.
+     * claims the next free slot of that requested vehicle type, and is refused
+     * once that type's requested slots are all taken.
+     *
+     * $allowOverflow lifts that refusal, for the one case where going past the
+     * requested count is intentional rather than a mistake: an admin deliberately
+     * sending more riders than the parcel asked for. The per-slot picker on the
+     * pickups page keeps the cap, because a slot is one vehicle.
      */
     public function assign(
         Shipment $shipment,
@@ -43,6 +49,7 @@ class PickupAssignmentService
         ?int $targetWarehouseId = null,
         bool $confirmBusyAssignment = false,
         ?int $pickupVehicleTypeId = null,
+        bool $allowOverflow = false,
     ): array {
         if (! $shipment->canBeAssigned()) {
             return [
@@ -106,7 +113,7 @@ class PickupAssignmentService
                     ->where('status', '!=', PickupAssignmentStatus::CANCELLED)
                     ->count();
 
-                if ($alreadyAssigned >= $requested) {
+                if (! $allowOverflow && $alreadyAssigned >= $requested) {
                     return ['success' => false, 'message' => 'All requested slots for that vehicle type are already assigned.'];
                 }
 
@@ -218,7 +225,8 @@ class PickupAssignmentService
              * count towards coverage and would show as a rider the parcel never asked
              * for.
              */
-            $slots = $this->pickupSlotPlan($lockedShipment, count($driverIds), $pickupVehicleTypeId);
+            ['slots' => $slots, 'overflow_from' => $overflowFrom] =
+                $this->pickupSlotPlan($lockedShipment, count($driverIds), $pickupVehicleTypeId);
 
             /*
              * Check every rider before writing any of them, so the common refusal
@@ -272,6 +280,9 @@ class PickupAssignmentService
                     targetWarehouseId: $targetWarehouseId,
                     confirmBusyAssignment: $confirmBusyAssignment,
                     pickupVehicleTypeId: $slots[$index] ?? null,
+                    // Past the requested count these are riders the admin chose to
+                    // add, so assign()'s per-type cap must not turn them away.
+                    allowOverflow: $index >= $overflowFrom,
                 );
 
                 if (! ($result['success'] ?? false)) {
@@ -317,18 +328,22 @@ class PickupAssignmentService
      * All-null when the parcel named no vehicles at all: the legacy case, where
      * riders are added unslotted exactly as they always were.
      *
-     * @return array<int, int|null>
+     * `overflow_from` is the index at which riders stop filling requested slots and
+     * start being extras the admin chose to send. assign() has to know, because its
+     * per-type cap must not refuse them.
+     *
+     * @return array{slots: array<int, int|null>, overflow_from: int}
      */
     private function pickupSlotPlan(Shipment $shipment, int $riderCount, ?int $onlyTypeId = null): array
     {
         if ($riderCount < 1) {
-            return [];
+            return ['slots' => [], 'overflow_from' => 0];
         }
 
         $namedVehicles = $shipment->pickupVehicleRequests()->exists();
 
         if (! $namedVehicles) {
-            return array_fill(0, $riderCount, null);
+            return ['slots' => array_fill(0, $riderCount, null), 'overflow_from' => 0];
         }
 
         $open = $this->openPickupSlots($shipment, $onlyTypeId);
@@ -337,13 +352,14 @@ class PickupAssignmentService
         // wins; otherwise the last one the parcel named.
         $overflowType = $onlyTypeId ?? $this->lastRequestedVehicleTypeId($shipment);
 
-        $plan = array_slice($open, 0, $riderCount);
+        $slots = array_slice($open, 0, $riderCount);
+        $overflowFrom = count($slots);
 
-        while (count($plan) < $riderCount) {
-            $plan[] = $overflowType;
+        while (count($slots) < $riderCount) {
+            $slots[] = $overflowType;
         }
 
-        return $plan;
+        return ['slots' => $slots, 'overflow_from' => $overflowFrom];
     }
 
     /**
