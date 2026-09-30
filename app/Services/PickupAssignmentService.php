@@ -72,7 +72,7 @@ class PickupAssignmentService
             ];
         }
 
-        return DB::transaction(function () use ($shipment, $driver, $admin, $notes, $targetWarehouseId, $confirmBusyAssignment, $pickupVehicleTypeId) {
+        return DB::transaction(function () use ($shipment, $driver, $admin, $notes, $targetWarehouseId, $confirmBusyAssignment, $pickupVehicleTypeId, $allowOverflow) {
             $lockedShipment = Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
             $lockedDriver = Driver::query()->lockForUpdate()->findOrFail($driver->id);
 
