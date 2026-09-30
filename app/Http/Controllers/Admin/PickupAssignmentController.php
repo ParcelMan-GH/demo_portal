@@ -200,12 +200,21 @@ class PickupAssignmentController extends Controller
         $this->authorizePermission('shipments.assign_driver');
 
         $validated = $request->validate([
-            'driver_id' => ['required', 'exists:drivers,id'],
+            /*
+             * `driver_id` on its own is what the edit screen and older callers
+             * post. The shipment page's picker is multi-select and also posts
+             * `driver_ids[]` — and this endpoint used to read only `driver_id`,
+             * so choosing two riders assigned one and reported success, leaving a
+             * shipment that asked for two riders never covered.
+             */
+            'driver_id' => ['nullable', 'integer', 'exists:drivers,id', 'required_without:driver_ids'],
+            'driver_ids' => ['nullable', 'array', 'required_without:driver_id'],
+            'driver_ids.*' => ['integer', 'exists:drivers,id'],
             'target_warehouse_id' => ['required', 'exists:warehouses,id'],
             'notes' => ['nullable', 'string'],
             'confirm_busy_assignment' => ['sometimes', 'boolean'],
             // Optional: name the requested vehicle type to claim a slot for it.
-            // Omitted, the assignment is created unslotted exactly as before.
+            // Omitted, the riders fill the shipment's open slots in request order.
             'pickup_vehicle_type_id' => ['nullable', 'integer', 'exists:pickup_vehicle_types,id'],
         ]);
 
@@ -241,17 +250,25 @@ class PickupAssignmentController extends Controller
             ], 422);
         }
 
-        $driver = Driver::findOrFail($validated['driver_id']);
+        // Every selected rider, de-duplicated. `driver_id` is folded in so a
+        // caller posting both does not have to worry about which one wins.
+        $driverIds = collect($validated['driver_ids'] ?? [])
+            ->when(
+                filled($validated['driver_id'] ?? null),
+                fn ($ids) => $ids->push($validated['driver_id']),
+            )
+            ->all();
+
         $admin = Auth::guard('admin')->user();
 
-        $result = $this->pickupAssignmentService->assign(
-            $shipment,
-            $driver,
-            $admin,
-            $validated['notes'] ?? null,
-            (int) $validated['target_warehouse_id'],
-            (bool) ($validated['confirm_busy_assignment'] ?? false),
-            isset($validated['pickup_vehicle_type_id']) ? (int) $validated['pickup_vehicle_type_id'] : null,
+        $result = $this->pickupAssignmentService->assignMany(
+            shipment: $shipment,
+            driverIds: $driverIds,
+            admin: $admin,
+            notes: $validated['notes'] ?? null,
+            targetWarehouseId: (int) $validated['target_warehouse_id'],
+            confirmBusyAssignment: (bool) ($validated['confirm_busy_assignment'] ?? false),
+            pickupVehicleTypeId: isset($validated['pickup_vehicle_type_id']) ? (int) $validated['pickup_vehicle_type_id'] : null,
         );
 
         return response()->json($result, $this->assignmentResponseStatus($result));

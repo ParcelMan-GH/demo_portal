@@ -159,6 +159,229 @@ class PickupAssignmentService
         });
     }
 
+    /**
+     * Assign several riders to one shipment in a single transaction.
+     *
+     * The shipment page's picker is multi-select. This used to be handled by
+     * creating one assignment for the first id and dropping the rest, so picking
+     * two riders put one rider on the parcel and reported success — and a
+     * shipment whose requester asked for two riders could never be covered.
+     *
+     * Two things this does that a loop in the controller could not:
+     *
+     *  1. Places each rider in a real slot when the shipment named its vehicles.
+     *     An assignment with no vehicle type deliberately does not count towards
+     *     coverage, so riders added "unsotted" left a two-slot shipment reading as
+     *     unassigned however many riders it had.
+     *  2. Is atomic. A busy rider found on the second id would otherwise leave the
+     *     first already assigned, and the retry the UI then offers would assign
+     *     that first rider twice.
+     *
+     * @param  array<int, int|string|null>  $driverIds
+     */
+    public function assignMany(
+        Shipment $shipment,
+        array $driverIds,
+        ?User $admin = null,
+        ?string $notes = null,
+        ?int $targetWarehouseId = null,
+        bool $confirmBusyAssignment = false,
+        ?int $pickupVehicleTypeId = null,
+    ): array {
+        $driverIds = array_values(array_unique(array_filter(
+            array_map('intval', $driverIds),
+            fn (int $id) => $id > 0,
+        )));
+
+        if ($driverIds === []) {
+            return ['success' => false, 'message' => 'Select at least one rider.'];
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $lockedShipment = Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
+
+            $requestsVehicles = $lockedShipment->pickupVehicleRequests()->exists();
+            $openSlots = $this->openPickupSlots($lockedShipment, $pickupVehicleTypeId);
+
+            if ($requestsVehicles) {
+                /*
+                 * Every rider has to land in a named slot or coverage never moves,
+                 * so refuse the whole selection rather than quietly honour only
+                 * the part of it that fits.
+                 */
+                if (count($openSlots) < count($driverIds)) {
+                    DB::rollBack();
+
+                    $wanted = count($driverIds);
+                    $available = count($openSlots);
+
+                    return [
+                        'success' => false,
+                        'code' => 'not_enough_slots',
+                        'message' => $available === 0
+                            ? ($pickupVehicleTypeId !== null
+                                ? 'All requested slots for that vehicle type are already assigned.'
+                                : 'Every rider slot this shipment requested is already filled.')
+                            : sprintf(
+                                'This shipment has %d open rider slot%s but %d rider%s selected.',
+                                $available,
+                                $available === 1 ? '' : 's',
+                                $wanted,
+                                $wanted === 1 ? '' : 's',
+                            ),
+                    ];
+                }
+            } else {
+                // Legacy pickup: nothing was requested, so there are no slots and
+                // the riders are added unslotted exactly as before.
+                $openSlots = array_fill(0, count($driverIds), null);
+            }
+
+            /*
+             * Check every rider before writing any of them, so the common refusal
+             * (an inactive rider, or one who is already busy) comes back without
+             * having touched the shipment.
+             */
+            $drivers = [];
+
+            foreach ($driverIds as $driverId) {
+                $driver = Driver::query()->find($driverId);
+
+                if (! $driver) {
+                    DB::rollBack();
+
+                    return ['success' => false, 'message' => 'One of the selected riders no longer exists.'];
+                }
+
+                if (! $driver->is_active) {
+                    DB::rollBack();
+
+                    return ['success' => false, 'message' => "{$driver->name} is inactive."];
+                }
+
+                if (! $driver->hasCapability(Driver::CAPABILITY_PICKUP)) {
+                    DB::rollBack();
+
+                    return ['success' => false, 'message' => "{$driver->name} is not configured for pickup assignments."];
+                }
+
+                $busy = $this->workloads->busyConflict($driver, $confirmBusyAssignment);
+
+                if ($busy) {
+                    // A 409 the caller turns into an "assign anyway?" prompt. The
+                    // batch is rolled back first: nothing has been written yet.
+                    DB::rollBack();
+
+                    return $busy;
+                }
+
+                $drivers[] = $driver;
+            }
+
+            $assignments = [];
+
+            foreach ($drivers as $index => $driver) {
+                $result = $this->assign(
+                    shipment: $lockedShipment,
+                    driver: $driver,
+                    admin: $admin,
+                    notes: $notes,
+                    targetWarehouseId: $targetWarehouseId,
+                    confirmBusyAssignment: $confirmBusyAssignment,
+                    pickupVehicleTypeId: $openSlots[$index] ?? null,
+                );
+
+                if (! ($result['success'] ?? false)) {
+                    // Should be unreachable after the checks above; a concurrent
+                    // assignment racing us on the same driver or slot is the one
+                    // way it happens, and then nothing is written at all.
+                    DB::rollBack();
+
+                    return $result;
+                }
+
+                $assignments[] = $result['data']['assignment'];
+            }
+
+            DB::commit();
+
+            return [
+                'success' => true,
+                'message' => count($assignments) === 1
+                    ? 'Rider assigned successfully.'
+                    : count($assignments) . ' riders assigned successfully.',
+                'data' => [
+                    'assignments' => $assignments,
+                    // Kept because the shipment page reads a single `assignment`.
+                    'assignment' => $assignments[0],
+                ],
+            ];
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            throw $e;
+        }
+    }
+
+    /**
+     * The still-open pickup slots on a shipment, in request order.
+     *
+     * Each entry is the vehicle type id of a slot that is still free, so the first
+     * N entries are where the first N riders go. Already-filled slots are consumed
+     * from the front of each request, matching how pickupSlotBreakdown() counts.
+     *
+     * Empty when the shipment never named a vehicle: the legacy case, where riders
+     * are added without a slot and the caller falls back to unslotted rows.
+     *
+     * @return array<int, int>
+     */
+    private function openPickupSlots(Shipment $shipment, ?int $onlyTypeId = null): array
+    {
+        $requests = $shipment->pickupVehicleRequests()->orderBy('id')->get();
+
+        if ($requests->isEmpty()) {
+            return [];
+        }
+
+        $taken = PickupAssignment::query()
+            ->where('shipment_id', $shipment->id)
+            ->where('status', '!=', PickupAssignmentStatus::CANCELLED)
+            ->whereNotNull('pickup_vehicle_type_id')
+            ->selectRaw('pickup_vehicle_type_id, count(*) as total')
+            ->groupBy('pickup_vehicle_type_id')
+            ->pluck('total', 'pickup_vehicle_type_id')
+            ->toArray();
+
+        $open = [];
+
+        foreach ($requests as $request) {
+            $typeId = $request->pickup_vehicle_type_id;
+
+            // A request whose vehicle type row was deleted has no id to claim.
+            if (! $typeId) {
+                continue;
+            }
+
+            if ($onlyTypeId !== null && (int) $typeId !== $onlyTypeId) {
+                continue;
+            }
+
+            for ($i = 0; $i < (int) $request->quantity; $i++) {
+                if (($taken[$typeId] ?? 0) > 0) {
+                    $taken[$typeId]--;
+
+                    continue;
+                }
+
+                $open[] = (int) $typeId;
+            }
+        }
+
+        return $open;
+    }
+
     public function updateAssignment(
         PickupAssignment $assignment,
         ?int $newDriverId,
