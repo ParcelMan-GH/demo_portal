@@ -133,7 +133,23 @@
                         <div class="flex flex-col" :class="m.is_from_vendor ? 'items-start' : 'items-end'">
                             <div class="max-w-[70%] rounded-2xl px-3.5 py-2.5 text-sm"
                                  :class="m.is_from_vendor ? 'bg-white text-slate-800 border border-slate-200' : 'bg-orange-600 text-white'">
-                                <template x-if="m.attachment_url">
+                                {{-- Voice notes get a player, not a link: the whole
+                                     point of a voice note is that support can hear
+                                     it without leaving the thread. Native controls
+                                     rather than a custom bar, so scrubbing,
+                                     keyboard access and speed all work for free. --}}
+                                <template x-if="m.attachment_url && m.attachment_type === 'audio'">
+                                    <div class="mb-1">
+                                        <audio controls preload="metadata" :src="m.attachment_url"
+                                               class="w-64 max-w-full"></audio>
+                                        <template x-if="m.duration_seconds">
+                                            <div class="mt-0.5 text-[10px] opacity-70"
+                                                 x-text="clock(m.duration_seconds)"></div>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <template x-if="m.attachment_url && m.attachment_type !== 'audio'">
                                     <a :href="m.attachment_url" target="_blank" class="mb-1 block">
                                         <img :src="m.attachment_url" class="max-h-48 rounded-lg" alt="attachment">
                                     </a>
@@ -161,6 +177,22 @@
                     </template>
 
                     <div class="flex items-end gap-2">
+                        <template x-if="recording">
+                            <button type="button" @click="stopRecording()"
+                                    class="flex h-10 flex-shrink-0 items-center gap-2 rounded-full bg-rose-600 px-3 text-xs font-semibold text-white">
+                                <span class="h-2 w-2 animate-pulse rounded-full bg-white"></span>
+                                <span x-text="clock(recSeconds)"></span>
+                                <span>Stop</span>
+                            </button>
+                        </template>
+
+                        <template x-if="!recording">
+                            <button type="button" @click="startRecording()" title="Record a voice reply"
+                                    class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200">
+                                <svg class="h-5 w-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.5a3.5 3.5 0 003.5-3.5v-6a3.5 3.5 0 10-7 0v6a3.5 3.5 0 003.5 3.5zM5.5 11.5a6.5 6.5 0 1013 0M12 18.5V22"/></svg>
+                            </button>
+                        </template>
+
                         <label class="flex h-10 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200">
                             <svg class="h-5 w-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16l5-5 4 4 3-3 6 6M3 6h18v14H3z"/></svg>
                             <input type="file" class="hidden" accept="image/*,application/pdf" @change="pickAttachment($event)">
@@ -217,7 +249,9 @@ document.addEventListener('alpine:init', () => {
         threads: [], directory: [], meta: {}, loadingThreads: true,
         search: '', unreadOnly: false,
         activeId: null, vendor: {}, messages: [],
-        reply: '', attachment: null, attachmentName: '', sending: false, error: '',
+        reply: '', attachment: null, attachmentName: '', durationSeconds: null,
+        sending: false, error: '',
+        recording: false, recorder: null, recChunks: [], recSeconds: 0, recTimer: null,
         listTimer: null, threadTimer: null,
 
         boot() {
@@ -272,6 +306,52 @@ document.addEventListener('alpine:init', () => {
             await this.openThread(json.data.thread_id);
         },
 
+        clock(seconds) {
+            const safe = Number.isFinite(Number(seconds)) && Number(seconds) > 0 ? Math.floor(Number(seconds)) : 0;
+            return Math.floor(safe / 60) + ':' + String(safe % 60).padStart(2, '0');
+        },
+
+        /* Recorded in the browser via MediaRecorder and attached to the normal
+           reply flow, so a voice reply travels the same endpoint as any other
+           message rather than needing its own. */
+        async startRecording() {
+            this.error = '';
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                // Chrome emits audio/webm, Safari audio/mp4. Asking for webm
+                // unconditionally produces an unplayable blob on Safari.
+                const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+                const rec = new MediaRecorder(stream, { mimeType: mime });
+                this.recChunks = [];
+
+                rec.ondataavailable = (e) => { if (e.data && e.data.size) this.recChunks.push(e.data); };
+                rec.onstop = () => {
+                    stream.getTracks().forEach((t) => t.stop());
+                    const blob = new Blob(this.recChunks, { type: mime });
+                    const ext = mime.indexOf('webm') !== -1 ? 'webm' : 'm4a';
+                    this.attachment = new File([blob], 'voice-' + Date.now() + '.' + ext, { type: mime });
+                    this.durationSeconds = this.recSeconds;
+                    this.attachmentName = 'Voice note — ' + this.clock(this.recSeconds);
+                    this.recorder = null;
+                };
+
+                this.recSeconds = 0;
+                this.recTimer = setInterval(() => this.recSeconds++, 1000);
+                rec.start();
+                this.recorder = rec;
+                this.recording = true;
+            } catch (e) {
+                this.error = 'Microphone access is needed to record a voice reply.';
+            }
+        },
+
+        stopRecording() {
+            clearInterval(this.recTimer);
+            this.recording = false;
+            if (this.recorder && this.recorder.state !== 'inactive') this.recorder.stop();
+        },
+
         async openThread(id) {
             this.activeId = id;
             this.error = '';
@@ -322,6 +402,7 @@ document.addEventListener('alpine:init', () => {
         clearAttachment() {
             this.attachment = null;
             this.attachmentName = '';
+            this.durationSeconds = null;
         },
 
         async send() {
@@ -335,6 +416,7 @@ document.addEventListener('alpine:init', () => {
             if (this.attachment) {
                 body = new FormData();
                 if (text) body.append('message', text);
+                if (this.durationSeconds) body.append('duration_seconds', String(this.durationSeconds));
                 body.append('attachment', this.attachment);
             } else {
                 body = { message: text };

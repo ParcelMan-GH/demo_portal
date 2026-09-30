@@ -63,9 +63,12 @@ class VendorChatController extends Controller
             'message' => ['nullable', 'string', 'max:2000'],
             // 5 MB: a phone screenshot is comfortably under this, and an
             // unbounded upload on a support form is an easy way to fill a disk.
-            // Audio included for voice notes. m4a/aac are what both iOS and
-            // Android recorders produce; wav/ogg cover the web recorder.
-            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf,m4a,aac,mp3,ogg,wav,caf', 'max:10240'],
+            // Audio included for voice notes. m4a/aac are what the mobile
+            // recorders produce. webm and mp4 are NOT optional extras: a browser
+            // MediaRecorder emits audio/webm on Chrome and audio/mp4 on Safari,
+            // so omitting them would reject every voice reply an admin records
+            // from the portal itself.
+            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf,m4a,aac,mp3,ogg,wav,caf,webm,mp4,mpga', 'max:10240'],
             // Sent by the recording client, which is the only party that knows it.
             'duration_seconds' => ['nullable', 'integer', 'min:0', 'max:3600'],
         ]);
