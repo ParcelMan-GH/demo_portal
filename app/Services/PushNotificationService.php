@@ -21,21 +21,46 @@ class PushNotificationService
     // Public send helpers
     // ---------------------------------------------------------------
 
+    /**
+     * Record-and-push, or record-only when there is no device token.
+     *
+     * A vendor without an FCM token still has the app installed and still reads
+     * its in-app inbox, which is fed from `notification_logs`. Returning early
+     * here wrote no row at all, so every event that happened before the vendor
+     * granted push permission was invisible in the app: the shipment moved and
+     * the vendor was told nothing, on any channel. Ten of the fifteen live
+     * vendors are in exactly that state.
+     *
+     * A missing token is a reason not to *push*, not a reason not to *record*.
+     * The row is written with status `logged` — the event is real and belongs in
+     * the inbox, but no gateway accepted it. `sendToDriver` already worked this
+     * way; this makes the vendor path match it.
+     */
     public function sendToVendor(Vendor $vendor, string $title, string $body, array $data = [], string $type = 'general'): bool
     {
         if (!$vendor->fcm_token) {
+            $this->log('App\\Models\\Vendor', $vendor->id, $type, $title, $body, $data, 'logged');
             return false;
         }
-        return $this->send($vendor->fcm_token, $title, $body, $data, 'App\Models\Vendor', $vendor->id, $type);
+        return $this->send($vendor->fcm_token, $title, $body, $data, 'App\\Models\\Vendor', $vendor->id, $type);
     }
 
     public function sendToDriver(Driver $driver, string $title, string $body, array $data = [], string $type = 'general'): bool
     {
         if (!$driver->fcm_token) {
+            /*
+             * The class name here was escaped twice: written as
+             * `App\\\\Models\\\\Driver`, which in a PHP single-quoted string is
+             * `App\\Models\\Driver` — two backslashes, not one. The row was
+             * filed under a class name that no query matches, so the driver's
+             * inbox never saw it and the log looked like it had worked. The
+             * `send()` call below always used the correct single escape, which is
+             * why rows only ever appeared for drivers who had a token.
+             */
             $this->log('App\\Models\\Driver', $driver->id, $type, $title, $body, $data, 'logged');
             return false;
         }
-        return $this->send($driver->fcm_token, $title, $body, $data, 'App\Models\Driver', $driver->id, $type);
+        return $this->send($driver->fcm_token, $title, $body, $data, 'App\\Models\\Driver', $driver->id, $type);
     }
 
     public function sendToAdmin(User $user, string $title, string $body, array $data = [], string $type = 'general'): bool

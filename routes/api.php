@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AgentCommissionController;
 use App\Http\Controllers\Api\V1\AgentParcelController;
 use App\Http\Controllers\Api\V1\Auth\AgentAuthController;
 use App\Http\Controllers\Api\V1\Auth\DriverAuthController;
@@ -140,6 +141,18 @@ Route::prefix('v1/agent')->middleware(['auth:sanctum'])->group(function () {
     Route::post('/notifications/settings', [AgentParcelController::class, 'updateNotificationSettings']);
 
     Route::get('/earnings', [AgentParcelController::class, 'earnings']);
+
+    /*
+     * Commission history, and the breakdown behind any one cycle.
+     *
+     * These do not overlap with `/earnings`: that answers "what am I worth right
+     * now" for the balance card, these answer "how was each day earned" for the
+     * history screen. Both derive their money from the same
+     * `CommissionTier::findTierForAmount()` lookup, so the two can never
+     * disagree with each other or with the admin ledger.
+     */
+    Route::get('/commissions', [AgentCommissionController::class, 'index']);
+    Route::get('/commissions/{commission}', [AgentCommissionController::class, 'show']);
 });
 
 // API v1 - Vendor Profile & Operations

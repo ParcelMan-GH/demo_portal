@@ -35,7 +35,19 @@ class VendorNotificationController extends Controller
         if (!empty($validated['status'])) {
             $query->where('status', $validated['status']);
         } else {
-            $query->whereIn('status', ['sent', 'logged']);
+            /*
+             * `failed` is included on purpose, and this is the difference between
+             * an inbox that works and one that quietly hides history.
+             *
+             * `status` describes the *push channel*, not the event. A row is
+             * `failed` when FCM refused or was not configured — the shipment still
+             * moved and the vendor still needs to see it in the app. Filtering it
+             * out meant that when push broke, the vendor's inbox emptied instead
+             * of filling: of the 84 vendor rows on this deployment, 75 are
+             * `failed` and would have been invisible. A caller that specifically
+             * wants one channel's outcome can still pass `?status=failed`.
+             */
+            $query->whereIn('status', ['sent', 'logged', 'failed']);
         }
 
         if (!empty($validated['type'])) {
@@ -156,7 +168,9 @@ class VendorNotificationController extends Controller
 
         $updated = NotificationLog::where('notifiable_type', 'App\Models\Vendor')
             ->where('notifiable_id', $vendor->id)
-            ->whereIn('status', ['sent', 'logged'])
+            // Must match the set `index()` lists, or "mark all read" would leave
+            // rows the vendor can see permanently unread.
+            ->whereIn('status', ['sent', 'logged', 'failed'])
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
 
