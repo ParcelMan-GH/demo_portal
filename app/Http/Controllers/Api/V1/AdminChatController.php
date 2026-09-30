@@ -236,6 +236,8 @@ class AdminChatController extends Controller
                     'sender_type' => $m->sender_type,
                     'is_from_vendor' => $m->isFromVendor(),
                     'message' => $m->message,
+                    'attachment_type' => $m->attachment_type ?? 'text',
+                    'duration_seconds' => $m->duration_seconds,
                     'attachment_url' => $m->attachment_url,
                     'read_at' => $m->read_at?->toIso8601String(),
                     'created_at' => $m->created_at?->toIso8601String(),
@@ -250,7 +252,11 @@ class AdminChatController extends Controller
 
         $validated = $request->validate([
             'message' => ['nullable', 'string', 'max:2000'],
-            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
+            // Audio included for voice notes. m4a/aac are what both iOS and
+            // Android recorders produce; wav/ogg cover the web recorder.
+            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf,m4a,aac,mp3,ogg,wav,caf', 'max:10240'],
+            // Sent by the recording client, which is the only party that knows it.
+            'duration_seconds' => ['nullable', 'integer', 'min:0', 'max:3600'],
         ]);
 
         $attachmentUrl = null;
@@ -258,6 +264,24 @@ class AdminChatController extends Controller
         if ($request->hasFile('attachment')) {
             $path = $request->file('attachment')->store('chat-attachments', 'public');
             $attachmentUrl = Storage::disk('public')->url($path);
+        }
+
+
+        /*
+         * Derived from the uploaded file's own mime type rather than from the
+         * extension the client claimed. A phone that records to `.m4a` and names
+         * it `.tmp` would otherwise be stored as an image and rendered as a
+         * broken picture.
+         */
+        $attachmentType = 'text';
+        $durationSeconds = null;
+
+        if ($attachmentUrl !== null) {
+            $mime = (string) $request->file('attachment')?->getMimeType();
+            $attachmentType = str_starts_with($mime, 'audio/') ? 'audio' : 'image';
+            $durationSeconds = isset($validated['duration_seconds'])
+                ? (int) $validated['duration_seconds']
+                : null;
         }
 
         if (blank($validated['message'] ?? null) && $attachmentUrl === null) {
@@ -272,7 +296,9 @@ class AdminChatController extends Controller
             ChatThread::SENDER_ADMIN,
             $admin?->id,
             $validated['message'] ?? null,
-            $attachmentUrl
+            $attachmentUrl,
+            $attachmentType,
+            $durationSeconds
         );
 
         /*
@@ -312,7 +338,9 @@ class AdminChatController extends Controller
                 'id' => $message->id,
                 'sender_type' => $message->sender_type,
                 'message' => $message->message,
-                'attachment_url' => $message->attachment_url,
+                'attachment_type' => $message->attachment_type ?? 'text',
+            'duration_seconds' => $message->duration_seconds,
+            'attachment_url' => $message->attachment_url,
                 'created_at' => $message->created_at?->toIso8601String(),
             ],
         ], 201);

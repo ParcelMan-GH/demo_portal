@@ -65,13 +65,21 @@ class ChatThread extends Model
      * under-reports is worse than one that over-reports, because nobody goes
      * looking for a message they were never told about.
      */
-    public function addMessage(string $senderType, ?int $senderId, ?string $message, ?string $attachmentUrl = null): ChatMessage
-    {
-        return DB::transaction(function () use ($senderType, $senderId, $message, $attachmentUrl) {
+    public function addMessage(
+        string $senderType,
+        ?int $senderId,
+        ?string $message,
+        ?string $attachmentUrl = null,
+        string $attachmentType = 'text',
+        ?int $durationSeconds = null
+    ): ChatMessage {
+        return DB::transaction(function () use ($senderType, $senderId, $message, $attachmentUrl, $attachmentType, $durationSeconds) {
             $chat = $this->messages()->create([
                 'sender_type' => $senderType,
                 'sender_id' => $senderId,
                 'message' => $message,
+                'attachment_type' => $attachmentType,
+                'duration_seconds' => $durationSeconds,
                 'attachment_url' => $attachmentUrl,
                 'created_at' => now(),
             ]);

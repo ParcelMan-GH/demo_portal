@@ -63,7 +63,11 @@ class VendorChatController extends Controller
             'message' => ['nullable', 'string', 'max:2000'],
             // 5 MB: a phone screenshot is comfortably under this, and an
             // unbounded upload on a support form is an easy way to fill a disk.
-            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
+            // Audio included for voice notes. m4a/aac are what both iOS and
+            // Android recorders produce; wav/ogg cover the web recorder.
+            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf,m4a,aac,mp3,ogg,wav,caf', 'max:10240'],
+            // Sent by the recording client, which is the only party that knows it.
+            'duration_seconds' => ['nullable', 'integer', 'min:0', 'max:3600'],
         ]);
 
         $attachmentUrl = null;
@@ -79,6 +83,24 @@ class VendorChatController extends Controller
          * without a caption, so "blank" has to mean both are missing — checking
          * only the string would reject every captioned-photo-less message.
          */
+
+        /*
+         * Derived from the uploaded file's own mime type rather than from the
+         * extension the client claimed. A phone that records to `.m4a` and names
+         * it `.tmp` would otherwise be stored as an image and rendered as a
+         * broken picture.
+         */
+        $attachmentType = 'text';
+        $durationSeconds = null;
+
+        if ($attachmentUrl !== null) {
+            $mime = (string) $request->file('attachment')?->getMimeType();
+            $attachmentType = str_starts_with($mime, 'audio/') ? 'audio' : 'image';
+            $durationSeconds = isset($validated['duration_seconds'])
+                ? (int) $validated['duration_seconds']
+                : null;
+        }
+
         if (blank($validated['message'] ?? null) && $attachmentUrl === null) {
             throw ValidationException::withMessages([
                 'message' => 'Type a message or attach a file.',
@@ -97,7 +119,9 @@ class VendorChatController extends Controller
             ChatThread::SENDER_VENDOR,
             (int) $vendor->id,
             $validated['message'] ?? null,
-            $attachmentUrl
+            $attachmentUrl,
+            $attachmentType,
+            $durationSeconds
         );
 
         return response()->json([
@@ -116,6 +140,8 @@ class VendorChatController extends Controller
             'sender_type' => $message->sender_type,
             'is_mine' => $message->isFromVendor(),
             'message' => $message->message,
+            'attachment_type' => $message->attachment_type ?? 'text',
+            'duration_seconds' => $message->duration_seconds,
             'attachment_url' => $message->attachment_url,
             'read_at' => $message->read_at?->toIso8601String(),
             'created_at' => $message->created_at?->toIso8601String(),
