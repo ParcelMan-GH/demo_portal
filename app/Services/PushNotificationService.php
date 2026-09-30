@@ -231,11 +231,31 @@ class PushNotificationService
                     ->pluck('errorCode')
                     ->filter()
                     ->map(fn ($code) => strtoupper((string) $code));
-                if ($notifiableType === 'App\\Models\\Driver'
+                /*
+                 * Drop a token FCM says is dead.
+                 *
+                 * The class name is doubled here on purpose: this is a
+                 * single-quoted PHP string, so `App\\Models\\Driver` is the one
+                 * backslash-separated name that the log rows and the Driver query
+                 * both expect.
+                 *
+                 * This used to run for drivers only, which left a vendor, hub or
+                 * agent who reinstalled the app holding a dead token server-side:
+                 * every notification for them kept failing until they next opened
+                 * the app and re-registered. The same reply means the same thing
+                 * for every audience.
+                 */
+                $tokenOwners = [
+                    'App\\Models\\Driver' => Driver::class,
+                    'App\\Models\\Vendor' => Vendor::class,
+                    'App\\Models\\User' => User::class,
+                ];
+
+                if (isset($tokenOwners[$notifiableType])
                     && ($errorStatus === 'NOT_FOUND'
                         || $fcmErrorCodes->contains('UNREGISTERED')
                         || str_contains(strtoupper($errorMessage), 'UNREGISTERED'))) {
-                    Driver::query()
+                    $tokenOwners[$notifiableType]::query()
                         ->whereKey($notifiableId)
                         ->where('fcm_token', $token)
                         ->update(['fcm_token' => null]);
