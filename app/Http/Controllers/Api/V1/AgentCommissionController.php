@@ -75,10 +75,19 @@ class AgentCommissionController extends Controller
 
         $rows = $all->take($perPage)
             ->map(function (AgentDailyQuota $q) use ($currentCycleId) {
-                return $this->cycleSummary($q) + [
+                /*
+                 * `array_merge`, not `+`.
+                 *
+                 * `+` keeps the LEFT operand's value on a key collision, and
+                 * `cycleSummary()` already carries `is_current`, so
+                 * `cycleSummary($q) + ['is_current' => true]` silently discarded
+                 * the flag and every row came back false. The screen relies on it
+                 * to mark the cycle the header is showing.
+                 */
+                return array_merge($this->cycleSummary($q), [
                     'is_current' => $currentCycleId !== null
                         && (int) $currentCycleId === (int) $q->getKey(),
-                ];
+                ]);
             })
             ->values();
 
@@ -142,11 +151,11 @@ class AgentCommissionController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'commission' => $this->cycleSummary($quota) + [
+                'commission' => array_merge($this->cycleSummary($quota), [
                     'band_label' => $this->bandLabel($tier),
                     'rate_label' => $this->money($earned),
                     'next_band' => $this->nextBand($quota),
-                ],
+                ]),
                 'line_items' => $this->lineItems($agent->id, $quota, $earned),
                 'totals' => [
                     'collected' => $this->money((float) $quota->collected_amount),
@@ -207,6 +216,9 @@ class AgentCommissionController extends Controller
             }
 
             $rows[] = [
+                // 'call' rows are real work; the reconciling row appended below
+                // is 'adjustment'. The app styles the two differently.
+                'kind' => 'call',
                 'id' => $log->getKey(),
                 'parcel_id' => $log->shipment_item_id,
                 'tracking_code' => $item?->tracking_code,
@@ -235,19 +247,67 @@ class AgentCommissionController extends Controller
         }
 
         /*
-         * A cycle can carry `completed_tasks` with no matching confirmed log —
-         * a quota credited by the admin dashboard, or calls logged before the
-         * API path existed. Rather than let the rows silently not add up to the
-         * total, the discrepancy is reported so the screen can account for it.
+         * Reconcile the rows against the ledger.
+         *
+         * The two can legitimately disagree: a cycle accrued partly through the
+         * admin dashboard, or through calls logged before the API credit path
+         * existed, has a `collected_amount` the call logs do not add up to. On
+         * this deployment agent 12's cycle reads 3500 while its two logged calls
+         * total 3600.
+         *
+         * The ledger is authoritative — it is what was paid — so the difference
+         * is shown as its own row rather than dropped. Without it the row
+         * marginals summed to 150 under a headline of 120, and the running total
+         * ended somewhere the total contradicted. The adjustment's marginal is
+         * whatever makes the two agree, so both columns now land exactly on the
+         * cycle's own figures and the screen's arithmetic can be checked by hand.
+         *
+         * It is labelled, not hidden: an agent should be able to see that part of
+         * the day was credited outside their calls.
          */
         $loggedCollected = array_sum(array_column($rows, 'amount_collected_value'));
+        $cycleCollected = (float) $quota->collected_amount;
+        $delta = $cycleCollected - $loggedCollected;
+        $loggedMarginal = array_sum(array_column($rows, 'marginal_earned_value'));
+        $cycleTier = CommissionTier::findTierForAmount($cycleCollected);
+
+        if ($rows !== [] && abs($delta) >= 0.01) {
+            $rows[] = [
+                'kind' => 'adjustment',
+                'id' => null,
+                'parcel_id' => null,
+                'tracking_code' => null,
+                'recipient_name' => null,
+                'recipient_phone' => null,
+                'location' => null,
+                'shipment_item' => null,
+                'action' => 'unitemised_credit',
+                'action_label' => 'Credited without a call log',
+                'notes' => 'Recorded against this day but not tied to a call logged in the app — for example a dashboard credit.',
+                'occurred_at' => null,
+                'amount_collected' => $this->money($delta),
+                'amount_collected_value' => round($delta, 2),
+                'running_total' => $this->money($cycleCollected),
+                'running_total_value' => round($cycleCollected, 2),
+                'band_min' => $cycleTier?->min_collection !== null
+                    ? (float) $cycleTier->min_collection : null,
+                'band_max' => $cycleTier?->max_collection !== null
+                    ? (float) $cycleTier->max_collection : null,
+                'base_rate' => $this->money($cycleEarned),
+                'base_rate_value' => round($cycleEarned, 2),
+                'marginal_earned' => $this->money($cycleEarned - $loggedMarginal),
+                'marginal_earned_value' => round($cycleEarned - $loggedMarginal, 2),
+            ];
+        }
 
         return [
             'rows' => $rows,
             'count' => count($rows),
             'logged_collected' => $this->money($loggedCollected),
             'logged_collected_value' => round($loggedCollected, 2),
-            'matches_cycle' => abs($loggedCollected - (float) $quota->collected_amount) < 0.01,
+            'adjustment' => abs($delta) >= 0.01 ? $this->money($delta) : null,
+            'adjustment_value' => round($delta, 2),
+            'matches_cycle' => abs($loggedCollected - $cycleCollected) < 0.01,
             'cycle_collected' => $this->money((float) $quota->collected_amount),
             'cycle_collected_value' => round((float) $quota->collected_amount, 2),
             'cycle_earned' => $this->money($cycleEarned),
