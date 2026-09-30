@@ -112,7 +112,18 @@
             <h3 class="text-lg font-black text-slate-900 mb-1">Authorize Manual Override</h3>
             <p class="text-xs font-medium text-slate-500 mb-5">You are unlocking commissions for <span class="text-orange-600 font-bold" x-text="selectedAgentName"></span>.</p>
             
-            <form :action="`/admin/agents/ledger/${selectedQuotaId}/override`" method="POST">
+            {{--
+    The action is built from the NAMED route, then the quota id is substituted.
+
+    It used to be hard-coded as `/admin/agents/ledger/${selectedQuotaId}/override`,
+    which 404s: the route group carries an `admin.` NAME prefix but no `admin/`
+    URI prefix, so the real path is `/agents/ledger/{quota}/override`. Any
+    hand-written URL here is a guess about the prefix, and it was the wrong one.
+
+    Substituting in JS rather than in Blade because the id is only known once a
+    row's button is clicked.
+--}}
+<form :action="'{{ route('admin.agents.ledger.override', ['quota' => '__QUOTA_ID__']) }}'.replace('__QUOTA_ID__', selectedQuotaId)" method="POST">
                 @csrf
                 <div class="mb-5">
                     <label class="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Reason for Override (Required)</label>
