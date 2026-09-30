@@ -46,6 +46,7 @@ use App\Http\Controllers\Warehouse\TransportManifestController as WarehouseTrans
 use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
 use App\Http\Controllers\Warehouse\WalkinController as WarehouseWalkinController;
 use App\Http\Controllers\Warehouse\WarehouseShipmentChargesController;
+use App\Http\Controllers\Api\V1\AdminChatController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AgentAllocationController;
 use App\Http\Controllers\Warehouse\MobileCameraController;
@@ -267,6 +268,17 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::post('vendors', [VendorController::class, 'store'])->name('vendors.store');
         Route::get('vendors/{vendor}', [VendorController::class, 'showPage'])->name('vendors.show')->withTrashed();
         Route::get('vendors/{vendor}/json', [VendorController::class, 'show'])->name('vendors.show.json')->withTrashed();
+
+        /*
+         * Vendor support inbox. Registered inside the same auth:admin group as
+         * the vendor screens above, so the guard is the boundary — the portal's
+         * permission registry has no chat entry yet, and gating on an invented
+         * string would 403 every request silently.
+         */
+        Route::get('chats', [AdminChatController::class, 'index'])->name('chats.index');
+        Route::get('chats/{thread}', [AdminChatController::class, 'show'])->name('chats.show');
+        Route::post('chats/{thread}/messages', [AdminChatController::class, 'store'])->name('chats.messages.store');
+        Route::patch('chats/{thread}/read', [AdminChatController::class, 'markRead'])->name('chats.read');
         Route::put('vendors/{vendor}', [VendorController::class, 'update'])->name('vendors.update');
         Route::delete('vendors/{vendor}', [VendorController::class, 'destroy'])->name('vendors.destroy')->withTrashed();
         Route::patch('vendors/{vendor}/toggle-active', [VendorController::class, 'toggleActive'])

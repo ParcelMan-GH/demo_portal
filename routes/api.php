@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\V1\TransporterLocationController;
 use App\Http\Controllers\Api\V1\VendorEarningsController;
 use App\Http\Controllers\Api\V1\VendorLocationController;
 use App\Http\Controllers\Api\V1\VendorNotificationController;
+use App\Http\Controllers\Api\V1\VendorChatController;
 use App\Http\Controllers\Api\V1\VendorPickupVehicleTypeController;
 use App\Http\Controllers\Api\V1\VendorProfileController;
 use App\Http\Controllers\Api\V1\UserProfileController;
@@ -169,6 +170,14 @@ Route::prefix('v1/vendor')->middleware(['auth:sanctum', 'vendor.active'])->group
     Route::get('regions/{region}/districts', [VendorLocationController::class, 'districts']);
     Route::get('locations/search', [VendorLocationController::class, 'searchLocations']);
     Route::get('pickup-vehicle-types', [VendorPickupVehicleTypeController::class, 'index']);
+
+    /*
+     * Support chat. Two endpoints on purpose: fetching the conversation also
+     * clears the vendor's unread badge, so the app cannot fetch a thread and
+     * leave a badge showing for a message it has already read.
+     */
+    Route::get('chat', [VendorChatController::class, 'show']);
+    Route::post('chat/messages', [VendorChatController::class, 'store']);
 
     Route::get('shipments', [VendorShipmentController::class, 'index']);
     Route::post('shipments', [VendorShipmentController::class, 'store']);
