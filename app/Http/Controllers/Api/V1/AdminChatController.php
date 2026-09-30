@@ -52,6 +52,7 @@ class AdminChatController extends Controller
                 'list' => route('admin.chats.index'),
                 'show' => url('/admin/chats'),
                 'read' => url('/admin/chats'),
+                'open' => route('admin.chats.open'),
             ],
         ]);
     }
@@ -90,6 +91,47 @@ class AdminChatController extends Controller
             ->groupBy('thread_id')
             ->map(fn ($group) => $group->first());
 
+        /*
+         * Vendors who have never written in.
+         *
+         * Without this the inbox is a dead end on a fresh deployment: with no
+         * threads the list is empty and there is no way to start one, so support
+         * could not contact anyone until that person happened to message first.
+         *
+         * Shown when a search is active (so typing a name always surfaces that
+         * vendor) and when there are no threads at all (so the screen is never a
+         * blank wall). Otherwise it is omitted — listing the whole directory
+         * under every conversation would bury the conversations.
+         */
+        $directory = collect();
+
+        if ($search !== '' || $threads->isEmpty()) {
+            $directory = Vendor::query()
+                // Excludes anyone who already has a thread, because they are
+                // already in the list above and duplicating them would be
+                // ambiguous to click.
+                ->whereNotIn('id', ChatThread::query()->select('vendor_id'))
+                ->where('is_active', true)
+                ->when($search !== '', function ($q) use ($search) {
+                    $q->where(function ($inner) use ($search) {
+                        $inner->where('name', 'like', "%{$search}%")
+                            ->orWhere('business_name', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                    });
+                })
+                ->orderBy('business_name')
+                ->orderBy('name')
+                ->limit(25)
+                ->get()
+                ->map(fn (Vendor $v) => [
+                    'vendor_id' => $v->id,
+                    'name' => $v->name,
+                    'business_name' => $v->business_name,
+                    'phone' => $v->phone,
+                    'photo_url' => $v->photo_path,
+                ]);
+        }
+
         return response()->json([
             'success' => true,
             'data' => $threads->map(function (ChatThread $thread) use ($previews) {
@@ -97,6 +139,9 @@ class AdminChatController extends Controller
 
                 return [
                     'id' => $thread->id,
+                    // Carried alongside so the UI never has to guess which
+                    // vendor a thread belongs to.
+                    'vendor_id' => $thread->vendor_id,
                     'status' => $thread->status,
                     'unread_count' => $thread->unread_admin_count,
                     'last_message_at' => $thread->last_message_at?->toIso8601String(),
@@ -112,11 +157,45 @@ class AdminChatController extends Controller
                     ],
                 ];
             })->all(),
+            'directory' => $directory->all(),
             'meta' => [
                 'total' => ChatThread::count(),
                 'unread_threads' => ChatThread::where('unread_admin_count', '>', 0)->count(),
+                'directory_count' => $directory->count(),
             ],
         ]);
+    }
+
+    /**
+     * Open a conversation with any vendor, creating the thread if needed.
+     *
+     * `firstOrCreate` is safe here for the same reason as everywhere else: the
+     * unique index on `chat_threads.vendor_id` resolves two admins clicking the
+     * same vendor at once into one row, rather than two threads that then
+     * fragment the conversation.
+     */
+    public function open(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'vendor_id' => ['required', 'integer', 'exists:vendors,id'],
+        ]);
+
+        $vendor = Vendor::findOrFail($validated['vendor_id']);
+        $thread = ChatThread::forVendor($vendor->id);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'thread_id' => $thread->id,
+                'vendor' => [
+                    'id' => $vendor->id,
+                    'name' => $vendor->name,
+                    'business_name' => $vendor->business_name,
+                    'phone' => $vendor->phone,
+                    'photo_url' => $vendor->photo_path,
+                ],
+            ],
+        ], $thread->wasRecentlyCreated ? 201 : 200);
     }
 
     public function show(Request $request, int $thread): JsonResponse

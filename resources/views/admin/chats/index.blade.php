@@ -39,7 +39,8 @@
             </template>
             <template x-if="!loadingThreads && !threads.length">
                 <div class="p-6 text-center text-sm text-slate-400">
-                    No vendor conversations yet.
+                    No conversations yet — search above, or pick a vendor from
+                    the list below.
                 </div>
             </template>
 
@@ -68,6 +69,31 @@
                     </div>
                     <div class="truncate text-[11px] text-slate-400" x-text="t.vendor.phone || ''"></div>
                 </button>
+            </template>
+
+            {{-- Vendors with no conversation yet. Without this the inbox is a
+                 dead end on a fresh deployment: no threads means an empty list
+                 and no way to start one, so support could not contact anybody
+                 until that person happened to write in first. --}}
+            <template x-if="directory.length">
+                <div>
+                    <div class="border-y border-slate-100 bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Start a conversation
+                    </div>
+                    <template x-for="v in directory" :key="v.vendor_id">
+                        <button type="button" @click="startThread(v.vendor_id)"
+                                class="flex w-full items-center gap-3 border-b border-slate-100 px-3 py-3 text-left hover:bg-slate-50">
+                            <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600"
+                                  x-text="(v.business_name || v.name || '?').charAt(0).toUpperCase()"></span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block truncate text-sm font-semibold text-slate-800"
+                                      x-text="v.business_name || v.name || 'Vendor'"></span>
+                                <span class="block truncate text-[11px] text-slate-400" x-text="v.phone || 'No phone on file'"></span>
+                            </span>
+                            <span class="flex-shrink-0 text-[11px] font-semibold text-orange-600">Message</span>
+                        </button>
+                    </template>
+                </div>
             </template>
         </div>
     </div>
@@ -188,7 +214,7 @@ document.addEventListener('alpine:init', () => {
     };
 
     Alpine.data('vendorInbox', () => ({
-        threads: [], meta: {}, loadingThreads: true,
+        threads: [], directory: [], meta: {}, loadingThreads: true,
         search: '', unreadOnly: false,
         activeId: null, vendor: {}, messages: [],
         reply: '', attachment: null, attachmentName: '', sending: false, error: '',
@@ -231,7 +257,19 @@ document.addEventListener('alpine:init', () => {
                 this.threads = json.data;
                 this.meta = json.meta || {};
             }
+            this.directory = json.directory || [];
             this.loadingThreads = false;
+        },
+
+        /* Starts a conversation with a vendor who has never written in. The
+           thread is created server-side on demand, so no empty thread rows pile
+           up for vendors nobody has contacted. */
+        async startThread(vendorId) {
+            const { ok, json } = await send(@json($endpoints['open']), 'POST', { vendor_id: vendorId });
+            if (!ok || !json.data) return;
+
+            await this.loadThreads(true);
+            await this.openThread(json.data.thread_id);
         },
 
         async openThread(id) {
