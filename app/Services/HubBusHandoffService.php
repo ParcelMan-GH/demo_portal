@@ -59,6 +59,7 @@ class HubBusHandoffService
 
     public function __construct(
         private SmsService $smsService,
+        private PushNotificationService $pushService,
         private StorageService $storageService,
     ) {}
 
@@ -263,6 +264,9 @@ class HubBusHandoffService
 
         $sms = $this->notifyCustomer($handoff);
 
+        // Parallel vendor notification, independent of the customer result.
+        $vendorNotify = $this->notifyVendor($handoff);
+
         return [
             'success' => true,
             'message' => $sms['sent']
@@ -408,6 +412,7 @@ class HubBusHandoffService
 
         foreach ($notify as $handoff) {
             if (($this->notifyCustomer($handoff)['sent'] ?? false) === true) {
+                $this->notifyVendor($handoff);
                 $smsSent++;
             }
         }
@@ -491,6 +496,91 @@ class HubBusHandoffService
             'phone' => $phone,
             'error' => $sent ? null : 'The SMS provider did not accept the message.',
         ];
+    }
+
+    /**
+     * The vendor-side twin of `notifyCustomer()`.
+     *
+     * The recipient is told the parcel is on the bus; the vendor is the one
+     * actually accountable for it, and until now they learned nothing at
+     * handover unless they happened to open the app. Both channels fire: SMS
+     * reaches them when the app is closed, and the push writes an in-app row
+     * (even with no FCM token) so there is a record either way.
+     *
+     * Never throws: a handoff that has already been recorded must not fail
+     * because a notification did.
+     *
+     * @return array{sms: bool, push: bool, phone: ?string, error: ?string}
+     */
+    public function notifyVendor(HubBusHandoff $handoff): array
+    {
+        try {
+            $handoff->loadMissing('shipmentItem.shipment.vendor');
+
+            /*
+             * The vendor hangs off the shipment, not the item — `ShipmentItem`
+             * has only `shipment()`. Reaching for `->vendor` on the item returns
+             * null silently rather than erroring, so the wrong path here would
+             * look like "this parcel has no vendor" forever.
+             */
+            $vendor = $handoff->shipmentItem?->shipment?->vendor;
+
+            if (! $vendor) {
+                return ['sms' => false, 'push' => false, 'phone' => null, 'error' => 'The parcel has no vendor on record.'];
+            }
+
+            $tracking = $handoff->shipmentItem?->tracking_code ?: 'Your package';
+            $from = $handoff->hub?->name ?: 'the hub';
+            $to = $handoff->destination_hub_name ?? $handoff->bus_company ?? null;
+
+            $body = "{$tracking} has been dispatched from {$from}"
+                . ($to ? " to {$to}" : '')
+                . '. ';
+
+            $smsSent = false;
+            $phone = $vendor->phone;
+
+            if (filled($phone)) {
+                try {
+                    $link = $this->urlForToken($this->issuePublicLink($handoff));
+                    $smsSent = $this->smsService->send(
+                        PhoneHelper::format($phone) ?? $phone,
+                        "ParcelMan: {$body}Handover details: {$link}"
+                    );
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+
+            $pushSent = false;
+
+            try {
+                $pushSent = $this->pushService->sendToVendor(
+                    $vendor,
+                    'Parcel dispatched on bus',
+                    $body,
+                    [
+                        'type' => 'bus_handoff',
+                        'handoff_id' => (string) $handoff->id,
+                        'tracking_code' => (string) $handoff->shipmentItem?->tracking_code,
+                    ],
+                    'bus_handoff'
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            return [
+                'sms' => $smsSent,
+                'push' => $pushSent,
+                'phone' => $phone,
+                'error' => ($smsSent || $pushSent) ? null : 'Neither SMS nor push was accepted.',
+            ];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return ['sms' => false, 'push' => false, 'phone' => null, 'error' => 'Vendor notification failed.'];
+        }
     }
 
     /**
