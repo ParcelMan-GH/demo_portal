@@ -74,8 +74,14 @@ class DriverWorkloadService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    /** @param array<int, int|string|null> $includeDriverIds */
-    public function assignmentOptions(?string $capability = null, ?string $vehicleType = null, array $includeDriverIds = []): Collection
+    /**
+     * @param  string|array<int, string>|null  $vehicleType  A single driver vehicle type,
+     *                                                       or several to match any of —
+     *                                                       a parcel can request more than
+     *                                                       one kind of vehicle.
+     * @param  array<int, int|string|null>  $includeDriverIds
+     */
+    public function assignmentOptions(?string $capability = null, string|array|null $vehicleType = null, array $includeDriverIds = []): Collection
     {
         $capability = in_array($capability, Driver::CAPABILITIES, true)
             ? $capability
@@ -91,8 +97,16 @@ class DriverWorkloadService
                 }
             });
 
-        if ($vehicleType) {
-            $query->where('vehicle_type', $vehicleType);
+        // Normalised so a caller can pass one type or several. `whereIn` with a
+        // single value behaves exactly like the `where` this replaced.
+        $vehicleTypes = collect(is_array($vehicleType) ? $vehicleType : [$vehicleType])
+            ->filter(fn ($type) => is_string($type) && trim($type) !== '')
+            ->map(fn ($type) => strtolower(trim($type)))
+            ->unique()
+            ->values();
+
+        if ($vehicleTypes->isNotEmpty()) {
+            $query->whereIn('vehicle_type', $vehicleTypes->all());
         }
 
         $drivers = $query->orderBy('name')->get([

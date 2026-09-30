@@ -442,6 +442,28 @@ function shipmentShow() {
             return labels.length ? labels.join(", ") : "-";
         },
 
+        /**
+         * The pickup vehicle type ids this parcel asked for.
+         *
+         * Sent to the rider endpoint so it can narrow the list to riders who can
+         * serve the pickup — a parcel asking for a Motorbike has no business
+         * offering a car driver. Empty when the parcel named no vehicles, in which
+         * case the endpoint returns everyone, exactly as before.
+         */
+        requestedPickupVehicleTypeIds() {
+            const rows = Array.isArray(this.shipment?.pickup_vehicles)
+                ? this.shipment.pickup_vehicles
+                : Array.isArray(this.shipment?.pickup_vehicle_requests)
+                  ? this.shipment.pickup_vehicle_requests
+                  : [];
+
+            return rows
+                .map((row) => row?.vehicle_type_id ?? row?.pickup_vehicle_type_id ?? null)
+                .filter((id) => id !== null && id !== undefined && id !== "")
+                .map((id) => Number(id))
+                .filter((id) => Number.isFinite(id) && id > 0);
+        },
+
         deliveryLocationSummary() {
             if (
                 this.shipment?.delivery_region_id &&
@@ -4392,9 +4414,19 @@ function shipmentShow() {
             this.assignmentForm.loadingWarehouses = true;
 
             try {
+                const driverQuery = new URLSearchParams({
+                    assignment_type: "pickup",
+                });
+
+                // Ask for the riders that match what this parcel requested, rather
+                // than every rider on the books.
+                this.requestedPickupVehicleTypeIds().forEach((id) =>
+                    driverQuery.append("pickup_vehicle_type_ids[]", id),
+                );
+
                 const [driversRes, warehousesRes] = await Promise.all([
                     fetch(
-                        `${this.config.availableDriversEndpoint}?assignment_type=pickup`,
+                        `${this.config.availableDriversEndpoint}?${driverQuery.toString()}`,
                         {
                             headers: { Accept: "application/json" },
                         },

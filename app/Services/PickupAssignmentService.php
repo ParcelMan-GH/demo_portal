@@ -9,6 +9,7 @@ use App\Models\Driver;
 use App\Models\PickupAssignment;
 use App\Models\PickupItemConfirmation;
 use App\Models\PickupPhoto;
+use App\Models\PickupVehicleType;
 use App\Models\RiderAssignmentEvent;
 use App\Models\Shipment;
 use App\Models\ShipmentItem;
@@ -480,7 +481,63 @@ class PickupAssignmentService
         });
     }
 
-    public function getAvailableDrivers(?string $vehicleType = null, ?string $assignmentType = null): array
+    /**
+     * Which driver vehicle serves a requested pickup vehicle.
+     *
+     * The two vocabularies do not line up. A parcel asks for motorbike / aboboyaa /
+     * van / truck, while a driver's own vehicle is motorcycle / car / van / truck.
+     * The translation lives here so the picker can send the ids it already has and
+     * the mapping stays in one place.
+     *
+     * Aboboyaa has no driver vehicle of its own. It maps to the motorcycle pool
+     * deliberately: a tricycle load is dispatched to a rider, and leaving it
+     * unmapped would list car, van and truck drivers for a tricycle pickup, which
+     * is backwards. This is the one line to change if that policy differs.
+     */
+    private const PICKUP_VEHICLE_DRIVER_VEHICLES = [
+        'motorbike' => 'motorcycle',
+        'aboboyaa' => 'motorcycle',
+        'van' => 'van',
+        'truck' => 'truck',
+    ];
+
+    /**
+     * Translate requested pickup vehicle type ids into driver vehicle types.
+     *
+     * Returns an empty array when nothing maps, which callers treat as "no
+     * constraint" — a filter that matches nobody would leave an admin unable to
+     * assign anyone at all.
+     *
+     * @param  array<int, int|string|null>  $pickupVehicleTypeIds
+     * @return array<int, string>
+     */
+    public function driverVehicleTypesForPickupTypes(array $pickupVehicleTypeIds): array
+    {
+        $ids = collect($pickupVehicleTypeIds)
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        return PickupVehicleType::query()
+            ->whereIn('id', $ids->all())
+            ->pluck('slug')
+            ->map(fn ($slug) => self::PICKUP_VEHICLE_DRIVER_VEHICLES[strtolower(trim((string) $slug))] ?? null)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  string|array<int, string>|null  $vehicleType  One driver vehicle type,
+     *                                                       or several to match any of.
+     */
+    public function getAvailableDrivers(string|array|null $vehicleType = null, ?string $assignmentType = null): array
     {
         $assignmentType = is_string($assignmentType) ? strtolower(trim($assignmentType)) : null;
         if (! in_array($assignmentType, Driver::CAPABILITIES, true)) {

@@ -492,7 +492,26 @@ $formatTimelineDate = fn ($value) => $value instanceof \Carbon\CarbonInterface
                                        role="combobox" aria-autocomplete="list" aria-controls="shipment-assign-rider-listbox"
                                        :aria-expanded="assignmentDriverPickerOpen"
                                        placeholder="Search and click to add riders..."
-                                       class="w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                       {{-- pr-11 keeps typed text clear of the toggle. --}}
+                                       class="w-full rounded-xl border-2 border-slate-200 bg-white py-2.5 pl-4 pr-11 text-sm text-slate-900 outline-none transition-all focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+
+                                {{-- Expand/collapse toggle. The list already opened on focus and
+                                     closed on click-outside or Escape, but there was no way to
+                                     put it away without dismissing the whole picker, so a long
+                                     list could only be closed by clicking somewhere else on the
+                                     page. type="button" so it never submits the form. --}}
+                                <button type="button"
+                                        @@click="assignmentDriverPickerOpen = !assignmentDriverPickerOpen; assignmentDriverActiveIndex = -1"
+                                        :aria-expanded="assignmentDriverPickerOpen"
+                                        aria-controls="shipment-assign-rider-listbox"
+                                        :aria-label="assignmentDriverPickerOpen ? 'Collapse the rider list' : 'Expand the rider list'"
+                                        class="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 transition hover:text-slate-700 focus:outline-none focus-visible:text-slate-700">
+                                    <svg class="h-4 w-4 transition-transform duration-150"
+                                         :class="assignmentDriverPickerOpen ? 'rotate-180' : ''"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
 
                                 <div x-show="assignmentDriverPickerOpen" x-cloak class="absolute left-0 right-0 z-40 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                                     <div id="shipment-assign-rider-listbox" role="listbox" aria-label="Pickup riders" class="max-h-64 overflow-y-auto">

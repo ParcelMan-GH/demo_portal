@@ -163,10 +163,34 @@ class PickupAssignmentController extends Controller
         $validated = $request->validate([
             'vehicle_type' => ['nullable', Rule::in(['motorcycle', 'car', 'van', 'truck'])],
             'assignment_type' => ['nullable', Rule::in(Driver::CAPABILITIES)],
+            /*
+             * The pickup vehicle types the parcel asked for. Sending the ids lets
+             * the list be narrowed to riders who can actually serve that pickups,
+             * instead of offering a car driver for a motorbike run. Ids rather than
+             * slugs because the translation to a driver's own vehicle type lives on
+             * the service, not in the browser.
+             */
+            'pickup_vehicle_type_ids' => ['nullable', 'array'],
+            'pickup_vehicle_type_ids.*' => ['integer', 'exists:pickup_vehicle_types,id'],
         ]);
 
+        $vehicleTypes = null;
+
+        if (! empty($validated['vehicle_type'])) {
+            $vehicleTypes = [$validated['vehicle_type']];
+        } elseif (! empty($validated['pickup_vehicle_type_ids'])) {
+            $vehicleTypes = $this->pickupAssignmentService
+                ->driverVehicleTypesForPickupTypes($validated['pickup_vehicle_type_ids']);
+
+            // A requested type with no driver equivalent must not filter the list
+            // down to nobody; fall back to the unfiltered list instead.
+            if ($vehicleTypes === []) {
+                $vehicleTypes = null;
+            }
+        }
+
         $drivers = $this->pickupAssignmentService->getAvailableDrivers(
-            $validated['vehicle_type'] ?? null,
+            $vehicleTypes,
             $validated['assignment_type'] ?? Driver::CAPABILITY_PICKUP
         );
 
