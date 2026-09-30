@@ -518,6 +518,13 @@ class DriverAssignmentController extends Controller
             'shipment_number' => $shipment->shipment_number,
             'status' => $shipment->status->value,
             'vendor_name' => $shipment->vendor?->name,
+            /*
+             * The sender's own number, so the rider can raise a problem with the
+             * vendor — a short delivery, a parcel that was not ready — without
+             * going back through the office. `pickup.contact_phone` below is the
+             * person at the pickup address and is often, but not always, the vendor.
+             */
+            'vendor_phone' => $shipment->vendor?->phone,
             'vendor_declared_quantity' => (int) (
                 $shipment->vendor_declared_quantity
                 ?? ($shipment->relationLoaded('items') ? $shipment->items->sum('quantity') : 0)

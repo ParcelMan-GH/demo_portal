@@ -863,7 +863,80 @@ class DriverPackageController extends Controller
             $lastStopItemId
         );
 
+        /*
+         * The vendor's first sight of a rider heading their way.
+         *
+         * Creating the run moves the parcels to out_for_delivery upstream, but
+         * nothing was sent to the sender: a vendor heard "ready for delivery" and
+         * then not another word until the doorstep. Called after the run is
+         * committed, so a push failure can never fail the rider's start.
+         */
+        if (($result['success'] ?? false) && ! empty($result['data']['delivery_run_id'])) {
+            $this->notifyVendorsOfStartedRun((int) $result['data']['delivery_run_id']);
+        }
+
         $statusCode = $result['success'] ? 200 : 422;
         return response()->json($result, $statusCode);
+    }
+
+    /**
+     * Tell every vendor with a parcel in this run that it is on the road.
+     *
+     * Grouped by vendor: a run routinely carries several parcels from one sender, and
+     * one notification naming the count is worth more than a ping per parcel. The
+     * in-app row is recorded per recipient as usual, so a vendor with no device token
+     * still finds it in the app.
+     */
+    private function notifyVendorsOfStartedRun(int $runId): void
+    {
+        try {
+            $run = DeliveryRun::query()
+                ->with(['items.shipmentItem.shipment.vendor'])
+                ->find($runId);
+
+            if (! $run) {
+                return;
+            }
+
+            $byVendor = [];
+
+            foreach ($run->items as $item) {
+                $vendor = $item->shipmentItem?->shipment?->vendor;
+
+                if (! $vendor) {
+                    continue;
+                }
+
+                $byVendor[$vendor->id] ??= ['vendor' => $vendor, 'count' => 0];
+                $byVendor[$vendor->id]['count']++;
+            }
+
+            $push = app(\App\Services\PushNotificationService::class);
+
+            foreach ($byVendor as $entry) {
+                $count = $entry['count'];
+
+                $push->sendToVendor(
+                    $entry['vendor'],
+                    'Out for Delivery',
+                    $count === 1
+                        ? 'A rider is on the way with 1 of your parcels.'
+                        : "A rider is on the way with {$count} of your parcels.",
+                    [
+                        'type' => 'out_for_delivery',
+                        'run_id' => (string) $run->id,
+                        'run_number' => (string) $run->run_number,
+                    ],
+                    'out_for_delivery'
+                );
+            }
+        } catch (\Throwable $e) {
+            // The run is committed and the rider is already moving; a missed push is
+            // not worth failing their start over.
+            \Log::warning('Vendor out-for-delivery push failed', [
+                'run_id' => $runId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }
