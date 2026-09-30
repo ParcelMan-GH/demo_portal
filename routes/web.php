@@ -47,6 +47,7 @@ use App\Http\Controllers\Warehouse\UserController as WarehouseUserController;
 use App\Http\Controllers\Warehouse\WalkinController as WarehouseWalkinController;
 use App\Http\Controllers\Warehouse\WarehouseShipmentChargesController;
 use App\Http\Controllers\Api\V1\AdminChatController;
+use App\Http\Controllers\Admin\CommissionRuleController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AgentAllocationController;
 use App\Http\Controllers\Warehouse\MobileCameraController;
@@ -279,6 +280,16 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('chats/{thread}', [AdminChatController::class, 'show'])->name('chats.show');
         Route::post('chats/{thread}/messages', [AdminChatController::class, 'store'])->name('chats.messages.store');
         Route::patch('chats/{thread}/read', [AdminChatController::class, 'markRead'])->name('chats.read');
+
+        /*
+         * Commission bands. `rules/data` is declared before the resource-style
+         * routes so "data" can never be mistaken for a band id.
+         */
+        Route::get('commissions/rules', [CommissionRuleController::class, 'index'])->name('commissions.rules');
+        Route::get('commissions/rules/data', [CommissionRuleController::class, 'data'])->name('commissions.rules.data');
+        Route::post('commissions/rules', [CommissionRuleController::class, 'store'])->name('commissions.rules.store');
+        Route::put('commissions/rules/{band}', [CommissionRuleController::class, 'update'])->name('commissions.rules.update');
+        Route::delete('commissions/rules/{band}', [CommissionRuleController::class, 'destroy'])->name('commissions.rules.destroy');
         Route::put('vendors/{vendor}', [VendorController::class, 'update'])->name('vendors.update');
         Route::delete('vendors/{vendor}', [VendorController::class, 'destroy'])->name('vendors.destroy')->withTrashed();
         Route::patch('vendors/{vendor}/toggle-active', [VendorController::class, 'toggleActive'])

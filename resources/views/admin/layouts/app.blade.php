@@ -120,6 +120,15 @@
                             </div>
                         </a>
 
+                        {{-- Commission bands: the payout ladder lives here, so it
+                             sits with the operational screens rather than in Settings. --}}
+                        <a href="{{ route('admin.commissions.rules') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('admin.commissions.rules') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                            <div class="flex items-center gap-3">
+                                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 7h6m-6 4h6m-6 4h3M5 3h14a1 1 0 011 1v16a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z"/></svg>
+                                <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Commission Rules</span>
+                            </div>
+                        </a>
+
                         @if($canReceiving)
                             <a href="{{ route('warehouse.walkin.create') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('warehouse.walkin.*') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
                                 <div class="flex items-center gap-3">

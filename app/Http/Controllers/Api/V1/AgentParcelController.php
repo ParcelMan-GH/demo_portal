@@ -240,6 +240,23 @@ class AgentParcelController extends Controller
                     ->count(),
 
                 /*
+                 * Whether the agent still has parcels to ring — the same three
+                 * conditions `getQueue()` uses, so the lock and the queue can
+                 * never disagree about whether work is outstanding. A locked
+                 * dashboard next to an empty queue (or the reverse) would be
+                 * worse than no lock at all.
+                 *
+                 * Counted here rather than derived in the app because the app
+                 * only ever holds the page it fetched, and a task on page two
+                 * would silently unlock the figure.
+                 */
+                'pending_tasks_count' => $pendingTasks = ShipmentItem::where('agent_id', $agent->id)
+                    ->where('status', ItemStatus::PICKED_UP)
+                    ->whereDoesntHave('agentCallLogs', fn ($query) => $query->where('agent_id', $agent->id))
+                    ->count(),
+                'has_remaining_tasks' => $pendingTasks > 0,
+
+                /*
                  * How many clients have actually paid this agent — the same
                  * question `callHistory()`'s `paid` answers, so the two screens
                  * can never disagree. Counted from a positive `amount_paid`
