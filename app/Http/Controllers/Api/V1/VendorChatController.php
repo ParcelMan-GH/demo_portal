@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\ChatMessage;
 use App\Models\ChatThread;
+use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +23,8 @@ class VendorChatController extends Controller
 {
     /** Messages per page. The app scrolls back, so this is a window, not a cap. */
     private const PER_PAGE = 50;
+
+    public function __construct(private PushNotificationService $push) {}
 
     public function show(Request $request): JsonResponse
     {
@@ -144,6 +147,46 @@ class VendorChatController extends Controller
             $attachmentType,
             $durationSeconds
         );
+
+        /*
+         * Tell support there is something waiting.
+         *
+         * Only the reply direction pushed. A vendor writing in notified nobody, so
+         * their message sat there until someone happened to open the inbox — which
+         * looks exactly like messages "not giving a push notification" from the
+         * vendor's side.
+         *
+         * Wrapped for the same reason the reply is: the message is already
+         * committed, and an undelivered push is a missed notification rather than a
+         * lost message, since it is still in the thread.
+         *
+         * `sendToAllAdmins()` records an in-app row even for a recipient with no
+         * FCM token, so support still finds it in the portal inbox. It matches the
+         * existing recipient rule for other vendor-initiated alerts.
+         */
+        try {
+            $preview = $validated['message'] ?? null;
+
+            $body = filled($preview)
+                ? mb_strimwidth($preview, 0, 120, '…')
+                : ($attachmentType === 'audio' ? 'Sent a voice note' : 'Sent a photo');
+
+            $this->push->sendToAllAdmins(
+                title: 'New message from ' . ($vendor->business_name ?: $vendor->name),
+                body: $body,
+                data: [
+                    'type' => 'chat',
+                    'thread_id' => (string) $thread->id,
+                    'vendor_id' => (string) $vendor->id,
+                ],
+                type: 'chat'
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Vendor chat message push failed', [
+                'thread_id' => $thread->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return response()->json([
             'success' => true,
