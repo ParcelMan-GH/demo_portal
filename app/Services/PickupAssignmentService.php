@@ -172,7 +172,7 @@ class PickupAssignmentService
      *
      *  1. Places each rider in a real slot when the shipment named its vehicles.
      *     An assignment with no vehicle type deliberately does not count towards
-     *     coverage, so riders added "unsotted" left a two-slot shipment reading as
+     *     coverage, so riders added unslotted left a two-slot shipment reading as
      *     unassigned however many riders it had.
      *  2. Is atomic. A busy rider found on the second id would otherwise leave the
      *     first already assigned, and the retry the UI then offers would assign
@@ -203,42 +203,22 @@ class PickupAssignmentService
         try {
             $lockedShipment = Shipment::query()->lockForUpdate()->findOrFail($shipment->id);
 
-            $requestsVehicles = $lockedShipment->pickupVehicleRequests()->exists();
-            $openSlots = $this->openPickupSlots($lockedShipment, $pickupVehicleTypeId);
-
-            if ($requestsVehicles) {
-                /*
-                 * Every rider has to land in a named slot or coverage never moves,
-                 * so refuse the whole selection rather than quietly honour only
-                 * the part of it that fits.
-                 */
-                if (count($openSlots) < count($driverIds)) {
-                    DB::rollBack();
-
-                    $wanted = count($driverIds);
-                    $available = count($openSlots);
-
-                    return [
-                        'success' => false,
-                        'code' => 'not_enough_slots',
-                        'message' => $available === 0
-                            ? ($pickupVehicleTypeId !== null
-                                ? 'All requested slots for that vehicle type are already assigned.'
-                                : 'Every rider slot this shipment requested is already filled.')
-                            : sprintf(
-                                'This shipment has %d open rider slot%s but %d rider%s selected.',
-                                $available,
-                                $available === 1 ? '' : 's',
-                                $wanted,
-                                $wanted === 1 ? '' : 's',
-                            ),
-                    ];
-                }
-            } else {
-                // Legacy pickup: nothing was requested, so there are no slots and
-                // the riders are added unslotted exactly as before.
-                $openSlots = array_fill(0, count($driverIds), null);
-            }
+            /*
+             * Where each rider goes — one entry per rider being assigned.
+             *
+             * The requested quantity is a floor the parcel has to meet, not a cap on
+             * how many riders may be sent. Refusing a third rider on a parcel that
+             * asked for two was wrong: a heavy run often needs another pair of hands,
+             * and the admin is the one looking at the load. Fewer than requested has
+             * always been allowed and still is; the coverage readout says how short
+             * it is.
+             *
+             * Riders beyond the requested count are still placed on a requested
+             * vehicle rather than left unslotted, because an unslotted rider does not
+             * count towards coverage and would show as a rider the parcel never asked
+             * for.
+             */
+            $slots = $this->pickupSlotPlan($lockedShipment, count($driverIds), $pickupVehicleTypeId);
 
             /*
              * Check every rider before writing any of them, so the common refusal
@@ -291,7 +271,7 @@ class PickupAssignmentService
                     notes: $notes,
                     targetWarehouseId: $targetWarehouseId,
                     confirmBusyAssignment: $confirmBusyAssignment,
-                    pickupVehicleTypeId: $openSlots[$index] ?? null,
+                    pickupVehicleTypeId: $slots[$index] ?? null,
                 );
 
                 if (! ($result['success'] ?? false)) {
@@ -324,6 +304,60 @@ class PickupAssignmentService
 
             throw $e;
         }
+    }
+
+    /**
+     * A vehicle type for every rider being assigned, in order.
+     *
+     * Open slots are filled first, in request order. Riders beyond that keep going
+     * on the last requested vehicle, so assigning three riders to a parcel that
+     * asked for two leaves all three counted against the pickup rather than the
+     * third floating without a slot.
+     *
+     * All-null when the parcel named no vehicles at all: the legacy case, where
+     * riders are added unslotted exactly as they always were.
+     *
+     * @return array<int, int|null>
+     */
+    private function pickupSlotPlan(Shipment $shipment, int $riderCount, ?int $onlyTypeId = null): array
+    {
+        if ($riderCount < 1) {
+            return [];
+        }
+
+        $namedVehicles = $shipment->pickupVehicleRequests()->exists();
+
+        if (! $namedVehicles) {
+            return array_fill(0, $riderCount, null);
+        }
+
+        $open = $this->openPickupSlots($shipment, $onlyTypeId);
+
+        // The vehicle to put anyone beyond the requested count on. An explicit type
+        // wins; otherwise the last one the parcel named.
+        $overflowType = $onlyTypeId ?? $this->lastRequestedVehicleTypeId($shipment);
+
+        $plan = array_slice($open, 0, $riderCount);
+
+        while (count($plan) < $riderCount) {
+            $plan[] = $overflowType;
+        }
+
+        return $plan;
+    }
+
+    /**
+     * The vehicle type on the parcel's last request, ignoring requests whose type
+     * row has since been deleted.
+     */
+    private function lastRequestedVehicleTypeId(Shipment $shipment): ?int
+    {
+        $id = $shipment->pickupVehicleRequests()
+            ->whereNotNull('pickup_vehicle_type_id')
+            ->orderByDesc('id')
+            ->value('pickup_vehicle_type_id');
+
+        return $id ? (int) $id : null;
     }
 
     /**
