@@ -37,6 +37,25 @@ class AdminChatController extends Controller
      * Sorted by `last_message_at`, not `updated_at`: opening a thread moves
      * `updated_at` but must not reshuffle the inbox under the reader's cursor.
      */
+    /**
+     * The split-pane inbox page.
+     *
+     * Separate from `GET /admin/chats`, which stays JSON: the page is a Blade
+     * route and merging the two would mean one endpoint answering in two content
+     * types depending on a header, which is the kind of thing that breaks the
+     * first time something fetches it without one.
+     */
+    public function page(): \Illuminate\View\View
+    {
+        return view('admin.chats.index', [
+            'endpoints' => [
+                'list' => route('admin.chats.index'),
+                'show' => url('/admin/chats'),
+                'read' => url('/admin/chats'),
+            ],
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $query = ChatThread::query()

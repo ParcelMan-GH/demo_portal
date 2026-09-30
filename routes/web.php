@@ -276,6 +276,8 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
          * permission registry has no chat entry yet, and gating on an invented
          * string would 403 every request silently.
          */
+        // The Blade page, separate from the JSON list above.
+        Route::get('vendor-messages', [AdminChatController::class, 'page'])->name('chats.page');
         Route::get('chats', [AdminChatController::class, 'index'])->name('chats.index');
         Route::get('chats/{thread}', [AdminChatController::class, 'show'])->name('chats.show');
         Route::post('chats/{thread}/messages', [AdminChatController::class, 'store'])->name('chats.messages.store');

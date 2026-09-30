@@ -120,6 +120,13 @@
                             </div>
                         </a>
 
+                        <a href="{{ route('admin.chats.page') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('admin.chats.page') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
+                            <div class="flex items-center gap-3">
+                                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h8m-8 4h5m-9 6l3.5-3H18a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12z"/></svg>
+                                <span class="transition-all duration-300 whitespace-nowrap" :class="sidebarCollapsed ? 'w-0 opacity-0 hidden' : ''">Vendor Messages</span>
+                            </div>
+                        </a>
+
                         {{-- Commission bands: the payout ladder lives here, so it
                              sits with the operational screens rather than in Settings. --}}
                         <a href="{{ route('admin.commissions.rules') }}" class="{{ $baseLinkCls }} {{ request()->routeIs('admin.commissions.rules') ? $activeCls : $inactiveCls }}" :class="sidebarCollapsed ? 'justify-center px-0' : ''">
