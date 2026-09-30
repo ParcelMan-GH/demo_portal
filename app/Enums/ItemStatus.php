@@ -37,7 +37,7 @@ enum ItemStatus: string
             // --- The human-readable label ---
             self::READY_FOR_HUB_TRANSFER => 'Ready for Hub Transfer',
             
-            self::SORTED => 'Sorted',
+            self::SORTED => 'Ready for Delivery',
 
             // --- Hub leg ---
             self::ARRIVED_AT_HUB => 'Arrived at Hub',

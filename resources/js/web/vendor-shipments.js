@@ -6,7 +6,7 @@ const SHIPMENT_STATUS_OPTIONS = [
     { value: 'pickup_assigned', label: 'Pickup Assigned' },
     { value: 'picked_up', label: 'Picked Up' },
     { value: 'at_warehouse', label: 'At Warehouse' },
-    { value: 'sorted', label: 'Sorted' },
+    { value: 'sorted', label: 'Ready for Delivery' },
     { value: 'in_transit', label: 'In Transit' },
     { value: 'at_destination', label: 'At Destination' },
     { value: 'out_for_delivery', label: 'Out for Delivery' },

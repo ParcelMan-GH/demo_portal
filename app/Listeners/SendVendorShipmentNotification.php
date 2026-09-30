@@ -70,7 +70,7 @@ class SendVendorShipmentNotification
             'pickup_assigned'   => ["Rider Assigned — {$shipmentNumber}", 'A rider has been assigned to pick up your parcel.'],
             'picked_up'         => ["Parcel Picked Up — {$shipmentNumber}", 'Your parcel has been collected by the rider.'],
             'at_warehouse'      => ["Parcel at Warehouse — {$shipmentNumber}", 'Your parcel has arrived at the warehouse.'],
-            'sorted'            => ["Parcel Sorted — {$shipmentNumber}", 'Your parcel has been sorted and is ready for dispatch.'],
+            'sorted'            => ["Parcel Ready for Delivery — {$shipmentNumber}", 'Your parcel has been sorted and is ready for delivery.'],
             'in_transit'        => ["Parcel in Transit — {$shipmentNumber}", 'Your parcel is in transit to the destination.'],
             'at_destination'    => ["Arrived at Destination — {$shipmentNumber}", 'Your parcel has arrived at the destination hub.'],
             'out_for_delivery'  => ["Out for Delivery — {$shipmentNumber}", 'Your parcel is out for delivery.'],

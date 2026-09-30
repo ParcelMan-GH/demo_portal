@@ -31,7 +31,9 @@ enum ShipmentStatus: string
             self::PICKUP_ASSIGNED => 'Pickup Assigned',
             self::PICKED_UP => 'Picked Up',
             self::AT_WAREHOUSE => 'At Warehouse',
-            self::SORTED => 'Sorted',
+            // Label only. The stored value stays `sorted` — the API, the filters
+            // and every existing row key on it.
+            self::SORTED => 'Ready for Delivery',
             self::IN_TRANSIT => 'In Transit',
             self::AT_DESTINATION => 'At Destination',
             self::OUT_FOR_DELIVERY => 'Out for Delivery',

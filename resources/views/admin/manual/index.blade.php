@@ -31,7 +31,7 @@
                 ],
                 'statuses' => [
                     ['Draft', 'slate'], ['Submitted', 'blue'], ['Processing', 'blue'], ['Pickup assigned', 'amber'],
-                    ['Picked up', 'amber'], ['At warehouse', 'violet'], ['Sorted', 'violet'], ['In transit', 'orange'],
+                    ['Picked up', 'amber'], ['At warehouse', 'violet'], ['Ready for delivery', 'violet'], ['In transit', 'orange'],
                     ['At destination', 'orange'], ['Out for delivery', 'orange'], ['Handed to courier', 'orange'],
                     ['Delivered', 'emerald'], ['Cancelled', 'red'], ['Rejected', 'red'],
                 ],
@@ -847,7 +847,7 @@
                                 <text x="578" y="208" text-anchor="middle" font-size="10.5" fill="#64748b">received + labelled</text>
 
                                 <rect x="352" y="170" width="124" height="52" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
-                                <text x="414" y="192" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0f172a">Sorted</text>
+                                <text x="414" y="192" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0f172a">Ready for delivery</text>
                                 <text x="414" y="208" text-anchor="middle" font-size="10.5" fill="#64748b">batched by destination</text>
 
                                 <rect x="188" y="170" width="124" height="52" rx="10" fill="#ffffff" stroke="#e2e8f0"/>

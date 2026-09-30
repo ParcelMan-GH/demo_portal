@@ -4147,7 +4147,7 @@ function shipmentShow() {
                 },
                 {
                     key: "sorted",
-                    label: "Sorted",
+                    label: "Ready for Delivery",
                     completed: !!item.sort_batch?.sealed_at,
                     active: !!(item.sort_batch && !item.sort_batch.sealed_at),
                     failed: false,

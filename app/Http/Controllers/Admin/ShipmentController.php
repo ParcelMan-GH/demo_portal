@@ -439,7 +439,7 @@ class ShipmentController extends Controller
                 $timeline[] = [
                     'status' => 'sorted',
                     'label' => 'Sorted — Batch '.$batch->batch_number,
-                    'status_label' => 'Sorted',
+                    'status_label' => 'Ready for Delivery',
                     'timestamp' => $ts, 'created_at' => $ts,
                     'location' => $batch->originWarehouse?->name,
                     'description' => 'Dispatch mode: '.$modeLabel,
