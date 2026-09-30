@@ -17,6 +17,29 @@ class SmsService
      */
     public function send(string $phone, string $message): bool
     {
+        /*
+         * Dry run: log the message and report success without touching the
+         * gateway.
+         *
+         * Exists so verification and staging runs cannot text a real customer.
+         * That is not hypothetical — an earlier verification pass sent a real
+         * SMS to a real vendor because the live gateway was exercised during a
+         * test. A guard in the service is enforceable; "remember to stub it" is
+         * not.
+         *
+         * Returns TRUE on purpose: callers branch on the return value, and a dry
+         * run should exercise the same success path as a real send, otherwise the
+         * flow under test is not the flow that ships.
+         */
+        if (config('services.sms.dry_run', false)) {
+            Log::info('SMS DRY RUN — not sent', [
+                'phone' => $phone,
+                'message' => $message,
+            ]);
+
+            return true;
+        }
+
         $formattedPhone = $this->formatPhoneNumber($phone);
         $provider = $this->getProvider();
         $senderId = $this->getSenderId();

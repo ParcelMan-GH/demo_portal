@@ -75,4 +75,11 @@ return [
         'timeout' => (int) env('GOOGLE_VISION_TIMEOUT', 25),
     ],
 
+    /*
+     * `SMS_DRY_RUN=true` makes SmsService log instead of send. Set it for
+     * verification runs and staging so tests cannot reach a real handset.
+     */
+    'sms' => [
+        'dry_run' => env('SMS_DRY_RUN', false),
+    ],
 ];

@@ -57,7 +57,7 @@
                             </td>
 
                             {{-- Status Badge --}}
-                            <td class="px-6 py-4 text-center">
+                            <td class="px-6 py-4 text-center" data-status-cell="{{ $ledger['id'] }}">
                                 @if($ledger['has_cleared_list'])
                                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -69,22 +69,40 @@
                                         Override Active
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                                    <span data-badge class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                                         Locked
                                     </span>
-                                @endif
+                                 @endif
+
+                             {{--
+                                 The unlocked badge lives in the DOM as a TEMPLATE rather than
+                                 being rebuilt in JavaScript: this markup already exists twice
+                                 in this file, and a third copy inside a JS string is the one
+                                 that drifts silently when someone restyles a badge.
+
+                                 It must sit INSIDE this status cell. A template element
+                                 placed between two cells is invalid table markup, and
+                                 browsers hoist it out of the row, taking the badge with it.
+                             --}}
+                             <template data-unlocked-template>
+                                <span data-badge class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
+
+                                    Override Active
+                                </span>
+                            </template>
                             </td>
 
                             {{-- Actions --}}
-                            <td class="px-6 py-4 text-right">
+                            <td class="px-6 py-4 text-right" data-action-cell="{{ $ledger['id'] }}">
                                 @if(!$ledger['has_cleared_list'] && !$ledger['is_unlocked'])
                                     <button @click="openOverrideModal({{ $ledger['id'] }}, '{{ addslashes($ledger['agent_name']) }}')" 
                                             class="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors">
                                         Override Lock
                                     </button>
                                 @else
-                                    <span class="text-xs font-medium text-slate-300 italic">No Action Needed</span>
+                                    <span data-no-action class="text-xs font-medium text-slate-300 italic">No Action Needed</span>
                                 @endif
                             </td>
                         </tr>
@@ -123,7 +141,7 @@
     Substituting in JS rather than in Blade because the id is only known once a
     row's button is clicked.
 --}}
-<form :action="'{{ route('admin.agents.ledger.override', ['quota' => '__QUOTA_ID__']) }}'.replace('__QUOTA_ID__', selectedQuotaId)" method="POST">
+<form :action="'{{ route('admin.agents.ledger.override', ['quota' => '__QUOTA_ID__']) }}'.replace('__QUOTA_ID__', selectedQuotaId)" @submit.prevent="submitOverride($event)" method="POST">
                 @csrf
                 <div class="mb-5">
                     <label class="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Reason for Override (Required)</label>
@@ -132,9 +150,13 @@
                               placeholder="e.g., Excused due to medical emergency..."></textarea>
                 </div>
                 
+                <div x-show="overrideError" x-cloak class="mb-4 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs font-medium text-rose-700" x-text="overrideError"></div>
+
                 <div class="flex gap-3 justify-end">
                     <button type="button" @click="modalOpen = false" class="px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Cancel</button>
-                    <button type="submit" class="px-4 py-2 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-500/30 rounded-xl transition-all">Authorize & Unlock</button>
+                    <button type="submit" :disabled="savingOverride"
+                            class="px-4 py-2 text-sm font-bold text-white bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-500/30 rounded-xl transition-all disabled:opacity-60"
+                            x-text="savingOverride ? 'Authorizing…' : 'Authorize & Unlock'"></button>
                 </div>
             </form>
         </div>
@@ -151,10 +173,86 @@ function commissionLedger() {
         selectedQuotaId: null,
         selectedAgentName: '',
         
+        savingOverride: false,
+        overrideError: '',
+
         openOverrideModal(id, name) {
             this.selectedQuotaId = id;
             this.selectedAgentName = name;
+            this.overrideError = '';
             this.modalOpen = true;
+        },
+
+        /*
+         * Submit over fetch and update the row in place.
+         *
+         * The normal form submit worked, but reloaded the entire ledger — on a
+         * long list that drops the reader back at the top and loses their place,
+         * for a change to one cell.
+         *
+         * The badge is cloned from the <template> already in the cell rather than
+         * built here, so the markup keeps one home.
+         */
+        async submitOverride(event) {
+            const form = event.target;
+            const reason = (new FormData(form).get('override_reason') || '').toString().trim();
+            const quotaId = this.selectedQuotaId;
+
+            if (reason.length < 5) {
+                this.overrideError = 'Give a reason of at least 5 characters — it is recorded against the override.';
+                return;
+            }
+
+            this.savingOverride = true;
+            this.overrideError = '';
+
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const post = () => fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': token,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: new FormData(form),
+            });
+
+            try {
+                let res = await post();
+                // Session rolled over under an open tab: re-read the token once.
+                if (res.status === 419) res = await post();
+
+                const json = await res.json().catch(() => ({}));
+
+                if (!res.ok) {
+                    const errs = json.errors || {};
+                    this.overrideError = errs.override_reason?.[0] || json.message || 'Could not authorize the override.';
+                    return;
+                }
+
+                this.applyOverrideToRow(quotaId);
+                this.modalOpen = false;
+                form.reset();
+            } catch (e) {
+                this.overrideError = 'Could not reach the server. Check your connection and try again.';
+            } finally {
+                this.savingOverride = false;
+            }
+        },
+
+        applyOverrideToRow(quotaId) {
+            const cell = document.querySelector('[data-status-cell="' + quotaId + '"]');
+            const template = cell?.querySelector('[data-unlocked-template]');
+            const existing = cell?.querySelector('[data-badge]');
+
+            if (template && existing) existing.replaceWith(template.content.cloneNode(true));
+
+            const actionCell = document.querySelector('[data-action-cell="' + quotaId + '"]');
+            if (actionCell) {
+                // The button that opened this modal must stop being clickable —
+                // there is nothing left to override on this row.
+                actionCell.innerHTML = '<span class="text-xs font-medium text-slate-300 italic">No Action Needed</span>';
+            }
         }
     }
 }
