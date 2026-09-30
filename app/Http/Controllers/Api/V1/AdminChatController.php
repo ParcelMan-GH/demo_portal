@@ -271,20 +271,38 @@ class AdminChatController extends Controller
 
 
         /*
-         * Derived from the uploaded file's own mime type rather than from the
-         * extension the client claimed. A phone that records to `.m4a` and names
-         * it `.tmp` would otherwise be stored as an image and rendered as a
-         * broken picture.
+         * Classify the upload.
+         *
+         * Three signals, because no single one is reliable:
+         *
+         *  1. A declared audio mime.
+         *  2. The extension. It is the tie-breaker that matters: PHP sniffs a
+         *     WebM *audio* blob as `video/webm`, not `audio/webm`, so a browser
+         *     recording from the portal failed an `audio/` prefix test and was
+         *     stored as an image — then rendered as a broken picture reading
+         *     "attachment" in the thread.
+         *  3. A duration. Only a recorder sends one, so its presence settles the
+         *     question even if both of the above are ambiguous.
          */
         $attachmentType = 'text';
         $durationSeconds = null;
 
         if ($attachmentUrl !== null) {
-            $mime = (string) $request->file('attachment')?->getMimeType();
-            $attachmentType = str_starts_with($mime, 'audio/') ? 'audio' : 'image';
+            $file = $request->file('attachment');
+            $mime = (string) $file?->getMimeType();
+            $ext = strtolower((string) $file?->getClientOriginalExtension());
+
+            $audioExtensions = ['m4a', 'aac', 'mp3', 'mpga', 'ogg', 'oga', 'wav', 'caf', 'webm', 'mp4'];
+
             $durationSeconds = isset($validated['duration_seconds'])
                 ? (int) $validated['duration_seconds']
                 : null;
+
+            $isAudio = str_starts_with($mime, 'audio/')
+                || in_array($ext, $audioExtensions, true)
+                || $durationSeconds !== null;
+
+            $attachmentType = $isAudio ? 'audio' : 'image';
         }
 
         if (blank($validated['message'] ?? null) && $attachmentUrl === null) {

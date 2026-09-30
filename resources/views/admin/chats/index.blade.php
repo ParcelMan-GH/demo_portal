@@ -121,10 +121,29 @@
                             </template>
                         </div>
                     </div>
-                    <a x-show="vendor.shipments_url" :href="vendor.shipments_url"
-                       class="flex-shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                        Active shipments
-                    </a>
+                    <div class="flex flex-shrink-0 items-center gap-2">
+                        {{--
+                            Dials the vendor's registered number through the browser
+                            or the operator's softphone.
+
+                            This is a `tel:` link rather than an in-app call because
+                            VoIP is not wired up yet — a button that visibly does
+                            nothing would be worse than a working phone call. When
+                            the Agora credentials land this becomes the entry point
+                            for an in-app call, and the fallback stays for vendors
+                            with no app session.
+                        --}}
+                        <a x-show="vendor.phone" :href="'tel:' + vendor.phone"
+                           class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h2.5a1 1 0 01.97.757l1 4a1 1 0 01-.29 1.02l-1.4 1.2a12 12 0 006.24 6.24l1.2-1.4a1 1 0 011.02-.29l4 1A1 1 0 0121 17.5V20a2 2 0 01-2 2A16 16 0 013 5z"/></svg>
+                            Call Vendor
+                        </a>
+
+                        <a x-show="vendor.shipments_url" :href="vendor.shipments_url"
+                           class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                            Active shipments
+                        </a>
+                    </div>
                 </div>
 
                 {{-- messages --}}
@@ -138,7 +157,7 @@
                                      it without leaving the thread. Native controls
                                      rather than a custom bar, so scrubbing,
                                      keyboard access and speed all work for free. --}}
-                                <template x-if="m.attachment_url && m.attachment_type === 'audio'">
+                                <template x-if="m.attachment_url && isAudio(m)">
                                     <div class="mb-1">
                                         <audio controls preload="metadata" :src="m.attachment_url"
                                                class="w-64 max-w-full"></audio>
@@ -149,9 +168,9 @@
                                     </div>
                                 </template>
 
-                                <template x-if="m.attachment_url && m.attachment_type !== 'audio'">
+                                <template x-if="m.attachment_url && !isAudio(m)">
                                     <a :href="m.attachment_url" target="_blank" class="mb-1 block">
-                                        <img :src="m.attachment_url" class="max-h-48 rounded-lg" alt="attachment">
+                                        <img :src="m.attachment_url" class="max-h-48 rounded-lg" alt="Image attachment">
                                     </a>
                                 </template>
                                 <span class="whitespace-pre-wrap" x-text="m.message || ''"></span>
@@ -304,6 +323,20 @@ document.addEventListener('alpine:init', () => {
 
             await this.loadThreads(true);
             await this.openThread(json.data.thread_id);
+        },
+
+        /*
+         * Audio detection for the thread.
+         *
+         * Prefers the stored type, but falls back to the file extension: rows
+         * written before the classifier was fixed carry `image` on a WebM voice
+         * note, and trusting the column alone left those rendering as a broken
+         * picture whose alt text showed as the word "attachment".
+         */
+        isAudio(m) {
+            if (m.attachment_type === 'audio') return true;
+            const url = (m.attachment_url || '').split('?')[0].toLowerCase();
+            return /\.(m4a|aac|mp3|mpga|ogg|oga|wav|caf|webm|mp4)$/.test(url);
         },
 
         clock(seconds) {
