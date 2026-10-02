@@ -10,6 +10,7 @@ use App\Models\RiderTeamHandoverItem;
 use App\Models\WarehouseReceiptItemLabel;
 use App\Services\RiderTeamHandoverService;
 use App\Services\StorageService;
+use App\Support\DriverRoles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -89,6 +90,13 @@ class DriverRiderTeamHandoverController extends Controller
      */
     private function provisionDriverProfile(?object $user, string $phone): ?Driver
     {
+        // Only a real driver account may be given a rider profile. This private
+        // copy predates the shared guard and would otherwise still hand one to
+        // any account with a phone number.
+        if (! DriverRoles::accountMayDrive($user)) {
+            return null;
+        }
+
         $fallbackEmail = 'rider-'.(preg_replace('/\D+/', '', $phone) ?: 'unknown').'@parcelmanexpress.local';
 
         foreach (array_values(array_unique(array_filter([$user?->email, $fallbackEmail]))) as $email) {

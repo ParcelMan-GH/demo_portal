@@ -41,6 +41,23 @@ class User extends Authenticatable
         'payout_account_name',
         'payout_account_number',
         'payout_account_updated_at',
+        'notification_settings',
+    ];
+
+    /**
+     * The agent app's alert toggles, and what they default to.
+     *
+     * Deliberately the same three keys as `Driver::DEFAULT_NOTIFICATION_PREFERENCES`
+     * so the two apps' notification screens stay the same shape. All default on:
+     * an agent who has never opened the screen is exactly the person who most needs
+     * a queue alert, so silence has to be a choice, not the starting state.
+     *
+     * @var array<string, bool>
+     */
+    public const DEFAULT_NOTIFICATION_SETTINGS = [
+        'queue_alerts' => true,
+        'payout_alerts' => true,
+        'in_app_sound' => true,
     ];
 
     /**
@@ -54,7 +71,29 @@ class User extends Authenticatable
         // Without this the column reads back as a string, and formatting it into
         // the API response throws "toISOString() on string".
         'payout_account_updated_at' => 'datetime',
+        'notification_settings' => 'array',
     ];
+
+    /**
+     * The stored alert toggles, with any missing key filled from the defaults.
+     *
+     * Read through this rather than `$user->notification_settings` directly: a
+     * row that predates the column, or one written before a toggle was added,
+     * would otherwise hand the app `null` for a key it is about to render as a
+     * switch, and the switch would come back off.
+     *
+     * @return array<string, bool>
+     */
+    public function notificationPreferences(): array
+    {
+        $stored = $this->notification_settings;
+
+        if (! is_array($stored)) {
+            return self::DEFAULT_NOTIFICATION_SETTINGS;
+        }
+
+        return array_merge(self::DEFAULT_NOTIFICATION_SETTINGS, $stored);
+    }
 
     /**
      * The attributes that should be hidden for serialization.

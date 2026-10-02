@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Concerns;
 
 use App\Models\Driver;
+use App\Support\DriverRoles;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -87,9 +88,17 @@ trait ResolvesActingDriver
     /**
      * Create the `drivers` row for an account that has none, so a newly hired
      * driver is not locked out of the app until someone adds them by hand.
+     *
+     * Only a real driver account qualifies. This used to run for anyone with a
+     * phone number, which handed an active rider profile — pickup and delivery
+     * rights — to any authenticated account that touched a driver route.
      */
     private function provisionDriverProfile(?object $user, string $phone): ?Driver
     {
+        if (! DriverRoles::accountMayDrive($user)) {
+            return null;
+        }
+
         $fallbackEmail = 'rider-'.(preg_replace('/\D+/', '', $phone) ?: 'unknown').'@parcelmanexpress.local';
 
         foreach (array_values(array_unique(array_filter([$user?->email, $fallbackEmail]))) as $email) {

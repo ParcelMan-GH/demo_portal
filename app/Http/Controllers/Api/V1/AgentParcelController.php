@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AgentCallLog;
 use App\Models\AgentDailyQuota;
 use App\Models\CommissionTier;
+use App\Models\NotificationLog;
 use App\Models\OutgoingBatchAssignmentEvent;
 use App\Models\ShipmentItem;
 use App\Services\OutgoingBatchAutoAssignmentService;
@@ -16,6 +17,24 @@ use Illuminate\Support\Facades\DB;
 
 class AgentParcelController extends Controller
 {
+    /**
+     * Parcel states that are past the point of calling.
+     *
+     * A call agent rings the recipient to arrange delivery, so a parcel already
+     * delivered or sent back has nothing left to arrange — and claiming it would
+     * drag the item backwards to `picked_up`, corrupting a finished delivery.
+     *
+     * Deliberately a deny-list rather than an allow-list: every other state
+     * legitimately precedes a call, and an allow-list would start refusing real
+     * claims the moment a new pre-call state is introduced.
+     *
+     * @var array<int, ItemStatus>
+     */
+    private const UNCLAIMABLE_STATUSES = [
+        ItemStatus::DELIVERED,
+        ItemStatus::RETURNED,
+    ];
+
     /**
      * Handle scan and claim for agent parcels
      */
@@ -48,18 +67,60 @@ class AgentParcelController extends Controller
             ], 404);
         }
 
-        // Assign to agent using valid Enum case
-        $parcel->update([
-            'agent_id' => $agent->id,
-            'status' => ItemStatus::PICKED_UP,
-            'claimed_at' => now(),
-        ]);
+        /*
+         * Claiming is a read-then-write on shared state: two agents scanning the
+         * same label would otherwise both pass every check below and the second
+         * would silently take the parcel from the first. The row is locked and
+         * the checks re-run inside the transaction, so only one claim can win.
+         */
+        return DB::transaction(function () use ($parcel, $agent) {
+            $parcel = ShipmentItem::query()
+                ->whereKey($parcel->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Parcel claimed successfully.',
-            'data' => $parcel,
-        ]);
+            // A finished delivery must not be dragged back to `picked_up`.
+            if (in_array($parcel->status, self::UNCLAIMABLE_STATUSES, true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This parcel is already ' . $parcel->status->label() . ' and cannot be claimed.',
+                ], 409);
+            }
+
+            // Someone else's parcel stays theirs. Taking it would move the
+            // recipient's call off the agent who started it.
+            if ($parcel->agent_id && (int) $parcel->agent_id !== (int) $agent->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This parcel is already claimed by another agent.',
+                ], 409);
+            }
+
+            /*
+             * Their own parcel, already claimed. Return without writing: this is
+             * a re-scan or a retried request, and rewriting `claimed_at` would
+             * count the parcel into today's quota a second time.
+             */
+            if ((int) $parcel->agent_id === (int) $agent->id) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Parcel already claimed.',
+                    'data' => $parcel,
+                ]);
+            }
+
+            $parcel->update([
+                'agent_id' => $agent->id,
+                'status' => ItemStatus::PICKED_UP,
+                'claimed_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Parcel claimed successfully.',
+                'data' => $parcel,
+            ]);
+        });
     }
 
     /**
@@ -832,5 +893,148 @@ class AgentParcelController extends Controller
             OutgoingBatchAutoAssignmentService::RESULT_ALREADY_BATCHED => 'Payment confirmed. '.$batching['message'],
             default => 'Payment confirmed, but the parcel could not be batched: '.$batching['message'],
         };
+    }
+
+    /**
+     * The agent's own notification feed, plus their alert toggles.
+     *
+     * These three routes existed in `routes/api.php` but the methods did not, so
+     * every call to the agent app's notifications screen answered 500. The shape
+     * is dictated by the app, which reads `data.items` (falling back to `items`
+     * and then `data`) for the list and a sibling `settings` for the switches —
+     * `notifications` is included as well so an older build that reads that key
+     * still finds its list.
+     */
+    public function notifications(Request $request)
+    {
+        $agent = $request->user();
+
+        $validated = $request->validate([
+            'type' => ['nullable', 'string', 'max:100'],
+            'is_read' => ['nullable', 'in:true,false,1,0'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $query = NotificationLog::query()
+            ->where('notifiable_type', 'App\\Models\\User')
+            ->where('notifiable_id', $agent->id);
+
+        if (!empty($validated['type'])) {
+            $query->where('type', $validated['type']);
+        }
+
+        if (array_key_exists('is_read', $validated) && !is_null($validated['is_read'])) {
+            filter_var($validated['is_read'], FILTER_VALIDATE_BOOLEAN)
+                ? $query->whereNotNull('read_at')
+                : $query->whereNull('read_at');
+        }
+
+        // Counted before the page is sliced, so the badge can show a total that
+        // is larger than the page the app is holding.
+        $total = (clone $query)->count();
+        $unread = (clone $query)->whereNull('read_at')->count();
+
+        $items = $query
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->offset((int) ($validated['offset'] ?? 0))
+            ->limit((int) ($validated['limit'] ?? 50))
+            ->get()
+            ->map(fn (NotificationLog $notification) => [
+                'id' => (string) $notification->id,
+                'title' => (string) $notification->title,
+                'message' => (string) $notification->body,
+                'created_at' => optional($notification->created_at)->toIso8601String(),
+                'read' => $notification->isRead(),
+                'type' => $this->notificationBucket((string) $notification->type),
+                'data' => $notification->data,
+            ])
+            ->values();
+
+        $settings = $agent->notificationPreferences();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'items' => $items,
+                'total' => $total,
+                'unread' => $unread,
+            ],
+            'notifications' => $items,
+            'settings' => $settings,
+        ]);
+    }
+
+    /**
+     * Mark every unread notification for this agent as read.
+     */
+    public function markAllNotificationsRead(Request $request)
+    {
+        $agent = $request->user();
+
+        $updated = NotificationLog::query()
+            ->where('notifiable_type', 'App\\Models\\User')
+            ->where('notifiable_id', $agent->id)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return response()->json([
+            'success' => true,
+            'message' => $updated.' '.($updated === 1 ? 'notification' : 'notifications').' marked as read.',
+            'data' => ['updated' => $updated],
+        ]);
+    }
+
+    /**
+     * Save the agent's alert toggles.
+     *
+     * Merged over what is already stored rather than replaced, because the app
+     * sends one key per tap — replacing would silently reset the other two.
+     */
+    public function updateNotificationSettings(Request $request)
+    {
+        $agent = $request->user();
+
+        $validated = $request->validate([
+            'queue_alerts' => ['sometimes', 'boolean'],
+            'payout_alerts' => ['sometimes', 'boolean'],
+            'in_app_sound' => ['sometimes', 'boolean'],
+        ]);
+
+        $settings = array_merge($agent->notificationPreferences(), $validated);
+
+        // forceFill: the model here is the authenticated user and may have been
+        // resolved without this attribute loaded.
+        $agent->forceFill(['notification_settings' => $settings])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification settings saved.',
+            'data' => ['settings' => $settings],
+            'settings' => $settings,
+        ]);
+    }
+
+    /**
+     * Fold a stored notification type into the three buckets the app has icons for.
+     *
+     * The column holds specific types ("out_for_delivery", "commission_paid"),
+     * but the screen only distinguishes what an agent acts on. Anything the app
+     * has no icon for falls to `system` rather than rendering an empty badge.
+     */
+    protected function notificationBucket(string $type): string
+    {
+        $type = strtolower($type);
+
+        if (str_contains($type, 'payout') || str_contains($type, 'commission') || str_contains($type, 'earning')) {
+            return 'payout';
+        }
+
+        if (str_contains($type, 'queue') || str_contains($type, 'parcel') || str_contains($type, 'call') || str_contains($type, 'assigned')) {
+            return 'queue';
+        }
+
+        return 'system';
     }
 }

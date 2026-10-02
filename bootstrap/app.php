@@ -41,6 +41,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'backoffice.user' => \App\Http\Middleware\EnsureBackOfficeUser::class,
             'vendor.active' => \App\Http\Middleware\EnsureVendorActive::class,
             'hub.agent' => \App\Http\Middleware\EnsureHubAgent::class,
+            // Gates an API group on the roles that may call it, e.g.
+            // `role:transporter,rider`. The agent and driver groups had no such
+            // gate, which is what let any authenticated account reach them.
+            'role' => \App\Http\Middleware\EnsureRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

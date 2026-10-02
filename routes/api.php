@@ -123,7 +123,16 @@ Route::prefix('v1/user')->middleware('auth:sanctum')->group(function () {
     Route::put('payout-account', [UserProfileController::class, 'updatePayoutAccount']);
 });
 
-Route::prefix('v1/agent')->middleware(['auth:sanctum'])->group(function () {
+/*
+ * Gated on `contact_agent`, the call-agent role. Without it this group was
+ * reachable by any token: `/v1/agent/login` authenticates a `users` row by phone
+ * alone, so a hub agent or a back-office account could sign in here and work as
+ * a call agent — claiming parcels and accruing commission.
+ *
+ * Agent logout lives at `/v1/auth/agent/logout`, outside this group, so gating
+ * the whole group cannot strand a token.
+ */
+Route::prefix('v1/agent')->middleware(['auth:sanctum', 'role:contact_agent'])->group(function () {
     Route::post('/parcels/scan-claim', [AgentParcelController::class, 'scanClaim']);
     Route::post('/parcels/claim', [AgentParcelController::class, 'scanClaim']);
     Route::post('/scan-claim', [AgentParcelController::class, 'scanClaim']);
@@ -213,8 +222,22 @@ Route::prefix('v1')->middleware(['auth:sanctum', 'throttle:60,1'])->group(functi
 Route::prefix('v1/driver')->group(function () {
     Route::post('login', [DriverAuthController::class, 'login']);
 
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::post('logout', [DriverAuthController::class, 'logout']);
+    /*
+     * Logout sits outside the role gate below. An account whose driver role was
+     * just revoked must still be able to end its own session — refusing the
+     * logout would leave the token alive until it expired, which is the opposite
+     * of what revoking the role is for.
+     */
+    Route::post('logout', [DriverAuthController::class, 'logout'])->middleware('auth:sanctum');
+
+    /*
+     * Gated on the two driver roles. `DriverAuthController::login` already
+     * requires the caller's role to match the portal they asked for, but nothing
+     * enforced it afterwards: this group was `auth:sanctum` alone, and
+     * `ResolvesActingDriver` would auto-create a `drivers` row for any account
+     * with a phone — so a hub agent could operate as a rider.
+     */
+    Route::middleware(['auth:sanctum', 'role:transporter,rider'])->group(function () {
         Route::get('profile', [DriverProfileController::class, 'show']);
         Route::put('profile', [DriverProfileController::class, 'update']);
         Route::post('profile/photo', [DriverProfileController::class, 'updatePhoto']);
