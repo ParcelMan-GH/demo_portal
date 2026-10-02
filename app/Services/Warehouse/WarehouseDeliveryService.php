@@ -2145,20 +2145,96 @@ class WarehouseDeliveryService
         // handed_off counts as "driver done" but NOT "delivery complete" — run stays partially_delivered
         $completedStops = $deliveredStops + $failedStops;
 
-        if ($totalStops > 0 && $completedStops === $totalStops) {
+        /*
+         * A finished run stays finished.
+         *
+         * This derives the run's status from its stops and is called from every
+         * stop transition, including ones reached on a run that has already ended.
+         * Without this, a cancelled run whose stops were all still pending fell
+         * through to the last branch below and was walked back to
+         * `out_for_delivery` — reopening a run that had been closed, and with it
+         * the driver's view of work they no longer had.
+         */
+        $terminal = in_array($run->status, [DeliveryRun::STATUS_COMPLETED, DeliveryRun::STATUS_CANCELLED], true);
+
+        if (! $terminal && $totalStops > 0 && $completedStops === $totalStops) {
             $run->update([
                 'status' => DeliveryRun::STATUS_COMPLETED,
                 'completed_at' => now(),
             ]);
-        } elseif ($completedStops > 0 || $handedOffStops > 0) {
+        } elseif (! $terminal && ($completedStops > 0 || $handedOffStops > 0)) {
             $run->update(['status' => DeliveryRun::STATUS_PARTIALLY_DELIVERED]);
-        } elseif ($run->status !== DeliveryRun::STATUS_OUT_FOR_DELIVERY) {
+        } elseif (! $terminal && in_array($run->status, [DeliveryRun::STATUS_DRAFT, DeliveryRun::STATUS_ASSIGNED], true)) {
+            /*
+             * Forward only. The previous condition here was simply "not already
+             * out_for_delivery", which let a `partially_delivered` run whose stops
+             * had all been reset fall backwards to `out_for_delivery` — and
+             * `partially_delivered` is further along, not less.
+             */
             $run->update(['status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY]);
         }
 
         if ($run->assigned_driver_id) {
             $this->workloads()->syncStatus($run->assigned_driver_id);
         }
+    }
+
+    /**
+     * How far along the delivery pipeline each shipment status sits.
+     *
+     * Only ever used to answer "would this be a step forward?". `cancelled` and
+     * `rejected` are deliberately absent: they are ways out of the pipeline, not
+     * stages along it, and a shipment that has taken one must never be walked back
+     * onto the main line by a recomputation.
+     *
+     * @var array<string, int>
+     */
+    private const SHIPMENT_STATUS_RANK = [
+        'draft' => 0,
+        'submitted' => 1,
+        'processing' => 2,
+        'pickup_assigned' => 3,
+        'picked_up' => 4,
+        'at_warehouse' => 5,
+        'sorted' => 6,
+        'in_transit' => 7,
+        'at_destination' => 8,
+        'out_for_delivery' => 9,
+        'handed_to_courier' => 10,
+        'delivered' => 11,
+    ];
+
+    /**
+     * Write a shipment status, but only ever forwards.
+     *
+     * These helpers derive a shipment's status from its items, and that derivation
+     * runs on paths that are reachable after the shipment has already moved on — a
+     * retried attempt, a handoff, a stop settled late. Recomputing freely let a
+     * `delivered` shipment be walked back to `at_destination`, and a `cancelled`
+     * one forward onto `out_for_delivery`; each time the tracking history came
+     * along, and any commission already settled stayed attached to a shipment that
+     * no longer claimed to be delivered.
+     *
+     * A recomputation may advance, or it may do nothing. Never otherwise.
+     */
+    private function advanceShipmentStatus(Shipment $shipment, ShipmentStatus $target): bool
+    {
+        $current = $shipment->status instanceof ShipmentStatus
+            ? $shipment->status
+            : ShipmentStatus::tryFrom((string) $shipment->status);
+
+        $currentRank = $current ? (self::SHIPMENT_STATUS_RANK[$current->value] ?? null) : null;
+        $targetRank = self::SHIPMENT_STATUS_RANK[$target->value] ?? null;
+
+        // No rank means a side exit (cancelled, rejected) or a status this map does
+        // not know. Leave it alone rather than guess at its position.
+        if ($currentRank === null || $targetRank === null || $targetRank <= $currentRank) {
+            return false;
+        }
+
+        $shipment->update(['status' => $target]);
+
+        return true;
     }
 
     private function syncShipmentOutForDeliveryStatus(Shipment $shipment): void
@@ -2171,8 +2247,8 @@ class WarehouseDeliveryService
             ])
             ->exists();
 
-        if ($allOutOrBeyond && $shipment->status !== ShipmentStatus::OUT_FOR_DELIVERY) {
-            $shipment->update(['status' => ShipmentStatus::OUT_FOR_DELIVERY]);
+        if ($allOutOrBeyond) {
+            $this->advanceShipmentStatus($shipment, ShipmentStatus::OUT_FOR_DELIVERY);
         }
     }
 
@@ -2186,9 +2262,7 @@ class WarehouseDeliveryService
             ->exists();
 
         if ($allDelivered) {
-            if ($shipment->status !== ShipmentStatus::DELIVERED) {
-                $shipment->update(['status' => ShipmentStatus::DELIVERED]);
-            }
+            $this->advanceShipmentStatus($shipment, ShipmentStatus::DELIVERED);
 
             return;
         }
@@ -2198,16 +2272,18 @@ class WarehouseDeliveryService
             ->exists();
 
         if ($anyOutForDelivery) {
-            if ($shipment->status !== ShipmentStatus::OUT_FOR_DELIVERY) {
-                $shipment->update(['status' => ShipmentStatus::OUT_FOR_DELIVERY]);
-            }
+            $this->advanceShipmentStatus($shipment, ShipmentStatus::OUT_FOR_DELIVERY);
 
             return;
         }
 
-        if ($shipment->status === ShipmentStatus::DELIVERED || $shipment->status === ShipmentStatus::OUT_FOR_DELIVERY) {
-            $shipment->update(['status' => ShipmentStatus::AT_DESTINATION]);
-        }
+        /*
+         * Nothing delivered and nothing out for delivery, so the derived status is
+         * `at_destination`. Reached from a shipment that was delivered or out for
+         * delivery, that derivation is a step BACKWARDS — which is exactly the case
+         * this guard exists for, so advanceShipmentStatus refuses it.
+         */
+        $this->advanceShipmentStatus($shipment, ShipmentStatus::AT_DESTINATION);
     }
 
     private function workloads(): DriverWorkloadService

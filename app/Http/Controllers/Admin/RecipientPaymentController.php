@@ -621,7 +621,16 @@ class RecipientPaymentController extends Controller
             $validated['payment_reference'] ?? null,
             $validated['notes'] ?? null,
             !$this->canRecipientPayment('manage_wallets'),
-            $receiptPath
+            $receiptPath,
+            /*
+             * When every task in the group is already settled this call stops being
+             * a payment and becomes a restatement of one, and the service refuses it
+             * without this flag. The endpoint only requires `process`, so without
+             * the override permission here anyone who could record a payment could
+             * also silently change what had been recorded as paid. The service
+             * audits every such correction it does allow.
+             */
+            $this->canRecipientPayment('override')
         );
 
         if ($result['success'] ?? false) {

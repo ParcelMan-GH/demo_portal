@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseReceipt;
 use App\Models\WarehouseReceiptItem;
+use App\Services\AdminAuditLogService;
 use App\Services\ChargesService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -27,7 +28,10 @@ use Illuminate\Support\Facades\Schema;
 
 class RecipientPaymentService
 {
-    public function __construct(private ChargesService $chargesService) {}
+    public function __construct(
+        private ChargesService $chargesService,
+        private AdminAuditLogService $auditLog,
+    ) {}
 
     public function paymentGroupForBatch(SortBatch $batch): string
     {
@@ -543,7 +547,13 @@ class RecipientPaymentService
         return ['success' => true, 'message' => 'Recipient details updated.'];
     }
 
-    public function markRecipientGroupPaid(Collection $tasks, float $amount, PaymentWallet $wallet, User $user, ?string $reference, ?string $notes = null, bool $requireAssignedWallet = true, ?string $receiptPath = null): array
+    /**
+     * @param  bool  $allowSettledCorrection  Whether the caller holds the override
+     *   permission needed to restate a payment that is already settled. Defaults to
+     *   false, so every caller that has not been taught about this keeps the safe
+     *   behaviour rather than silently gaining the power to restate settled money.
+     */
+    public function markRecipientGroupPaid(Collection $tasks, float $amount, PaymentWallet $wallet, User $user, ?string $reference, ?string $notes = null, bool $requireAssignedWallet = true, ?string $receiptPath = null, bool $allowSettledCorrection = false): array
     {
         if ($tasks->isEmpty()) {
             return ['success' => false, 'message' => 'No recipient payment tasks found.'];
@@ -557,7 +567,7 @@ class RecipientPaymentService
             return ['success' => false, 'message' => 'You can only record payments into an approved wallet assigned to you.'];
         }
 
-        $result = DB::transaction(function () use ($tasks, $amount, $wallet, $user, $reference, $notes, $receiptPath) {
+        $result = DB::transaction(function () use ($tasks, $amount, $wallet, $user, $reference, $notes, $receiptPath, $allowSettledCorrection) {
             $wallet = PaymentWallet::query()->lockForUpdate()->findOrFail($wallet->id);
             if (!$wallet->is_active) {
                 return ['success' => false, 'message' => 'This wallet is inactive.'];
@@ -574,6 +584,23 @@ class RecipientPaymentService
 
             $openTasks = $lockedTasks->reject(fn (RecipientPaymentTask $task) => $this->taskIsCleared($task))->values();
             if ($openTasks->isEmpty()) {
+                /*
+                 * Every task in the group is already settled, so this is not a
+                 * payment at all — it is a restatement of one.
+                 * correctRecipientGroupPayment rewrites the recorded amount of a
+                 * completed payment from whatever figure the request happens to
+                 * carry, so any user who could merely record payments could also
+                 * silently change what was recorded as paid. Recording and
+                 * restating are different powers, and the second needs the
+                 * override permission.
+                 */
+                if (! $allowSettledCorrection) {
+                    return [
+                        'success' => false,
+                        'message' => 'This recipient payment has already been settled. Correcting a settled payment needs the recipient-payment override permission.',
+                    ];
+                }
+
                 return $this->correctRecipientGroupPayment($lockedTasks, $amount, $wallet, $user, $reference, $notes, $receiptPath);
             }
 
@@ -733,6 +760,18 @@ class RecipientPaymentService
         }
 
         $primaryCharge = $group->shipmentCharge ?: $primaryTask->shipmentCharge ?: $this->deliveryFeeChargeForItem($primaryTask->shipmentItem);
+
+        /*
+         * Captured before the rewrite, so the audit entry can state what the
+         * figures WERE and not only what they became. A correction log that shows
+         * just the new number cannot answer "what was changed", which is the one
+         * question it exists to answer.
+         */
+        $chargeExisted = (bool) $primaryCharge;
+        $amountBefore = $primaryCharge ? (float) $primaryCharge->amount : 0.0;
+        $groupAmountBefore = (float) $group->amount;
+        $currency = (string) ($primaryCharge?->currency ?: $group->currency ?: 'GHS');
+
         if (!$primaryCharge) {
             $primaryCharge = $this->chargesService->addCharge($primaryTask->shipmentItem->shipment, [
                 'shipment_item_id' => $primaryTask->shipment_item_id,
@@ -808,6 +847,46 @@ class RecipientPaymentService
                 'notes' => $notes ?? $task->notes,
             ]);
         }
+
+        /*
+         * Settled money was restated, so it goes into the audit trail with both
+         * figures and the evidence attached to it.
+         *
+         * Written inside the same transaction as the change: a rollback must not be
+         * able to leave a logged correction that never happened, and a committed
+         * correction must never be missing its entry.
+         */
+        $this->auditLog->logMoneyAdjustment(
+            $user,
+            'recipient_payment.group_settlement_corrected',
+            $chargeExisted
+                ? sprintf(
+                    'Settled recipient payment #%d restated from %s %.2f to %s %.2f',
+                    $group->id, $currency, $amountBefore, $currency, (float) $primaryCharge->amount
+                )
+                : sprintf(
+                    'Delivery fee of %s %.2f recorded against already-settled recipient payment #%d',
+                    $currency, (float) $primaryCharge->amount, $group->id
+                ),
+            [
+                'recipient_payment_group_id' => $group->id,
+                'shipment_charge_id' => $primaryCharge->id,
+                'shipment_id' => $primaryTask->shipmentItem->shipment->id,
+                'shipment_item_id' => $primaryTask->shipment_item_id,
+                'recipient_payment_task_ids' => $tasks->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+                'charge_created_by_correction' => ! $chargeExisted,
+                'amount_before' => round($amountBefore, 2),
+                'amount_after' => round((float) $primaryCharge->amount, 2),
+                'group_amount_before' => round($groupAmountBefore, 2),
+                'group_amount_after' => round((float) $group->fresh()->amount, 2),
+                'delta' => round((float) $primaryCharge->amount - $amountBefore, 2),
+                'currency' => $currency,
+                'payment_wallet_id' => $wallet->id,
+                'payment_reference' => $reference,
+                'receipt_attached' => (bool) ($receiptPath ?: $group->receipt_path),
+                'notes' => $notes,
+            ]
+        );
 
         return ['success' => true, 'message' => 'Recipient payment updated.', 'group' => $group->fresh()];
     }

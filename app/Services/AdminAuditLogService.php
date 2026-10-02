@@ -99,6 +99,42 @@ class AdminAuditLogService
         ]);
     }
 
+    /**
+     * A deliberate change to a figure that had already been recorded.
+     *
+     * Kept apart from the request log rather than folded into it: that answers
+     * "which endpoint was called", this answers "what was the number before, what
+     * is it now, and who decided". Correcting a settled payment is exactly the
+     * kind of edit an audit trail exists for, and the request row cannot carry the
+     * before/after values. There is no request in scope at this point either — the
+     * correction runs inside a service — so the request-derived columns are left
+     * null and the action is attributed to the acting user.
+     */
+    public function logMoneyAdjustment(
+        User $actor,
+        string $action,
+        string $description,
+        array $metadata = [],
+        int $statusCode = 200
+    ): void {
+        AdminAuditLog::query()->create([
+            'user_id' => $actor->id,
+            'warehouse_id' => $actor->warehouse_id,
+            'scope' => $actor->warehouse_id ? 'warehouse' : 'system',
+            'action_type' => 'money_correction',
+            'action' => Str::limit($action, 180, ''),
+            'description' => Str::limit($description, 255, ''),
+            'method' => null,
+            'route_name' => null,
+            'url' => null,
+            'status_code' => $statusCode,
+            'ip_address' => null,
+            'user_agent' => null,
+            'duration_ms' => null,
+            'metadata' => $this->sanitize($metadata),
+        ]);
+    }
+
     public function logAuthEvent(
         string $action,
         string $description,
