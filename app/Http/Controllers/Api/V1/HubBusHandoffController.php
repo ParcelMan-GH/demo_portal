@@ -54,10 +54,24 @@ class HubBusHandoffController extends Controller
         $item = $match['item'];
 
         if ($error = $this->service->eligibilityError($hub, $item)) {
+            /*
+             * The parcel payload goes out only for a parcel this hub actually holds.
+             *
+             * `findItemByCode` resolves any code in the system, so scanning a code
+             * for a parcel held elsewhere produced the "held at X, not Y" refusal —
+             * correct — but returned `lookupData` beside it, and that carries the
+             * recipient's name and phone. The message was scoped to this hub; the
+             * data next to it was not.
+             *
+             * Kept for parcels that are here because the app renders the refusal
+             * against the parcel's own details, and withheld for the rest.
+             */
+            $heldHere = $item->isAtHub((int) $hub->id);
+
             return response()->json([
                 'success' => false,
                 'message' => $error['message'],
-                'data' => $this->lookupData($item, $hub, $match),
+                'data' => $heldHere ? $this->lookupData($item, $hub, $match) : null,
             ], $error['status']);
         }
 

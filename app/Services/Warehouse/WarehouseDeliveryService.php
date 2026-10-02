@@ -1014,6 +1014,19 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Stop already delivered.'];
         }
 
+        /*
+         * A handed-off stop is no longer with this driver, so arriving at it would
+         * move it backwards to `arrived` and re-issue a verification code for a
+         * parcel someone else is carrying. The app only offers "I've Arrived" for a
+         * `pending` stop, so this is only ever a stale screen or a retry.
+         *
+         * An already-`arrived` stop is deliberately NOT refused: re-arriving is
+         * currently the only way to re-issue a code the recipient did not receive.
+         */
+        if ($stop->status === DeliveryRunStop::STATUS_HANDED_OFF) {
+            return ['success' => false, 'message' => 'This stop has already been handed off.'];
+        }
+
         $stop->update([
             'status' => DeliveryRunStop::STATUS_ARRIVED,
             'arrived_at' => now(),
@@ -1091,6 +1104,23 @@ class WarehouseDeliveryService
                 ->where('delivery_run_id', $run->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            /*
+             * Re-checked under the lock, and this is the check that actually
+             * matters.
+             *
+             * The guard above reads the stop as bound from the route — a snapshot
+             * taken before this transaction opened. Two confirmations of the same
+             * stop both pass it, then queue on the lock below. Without a re-read
+             * the second one proceeds as if the stop were still pending and runs
+             * the whole delivery again: a second commission row for the same
+             * parcel, a second set of tracking rows, and a second push to the
+             * vendor. The lock does not prevent that on its own — it only makes
+             * the two run one after the other.
+             */
+            if ($stop->status === DeliveryRunStop::STATUS_DELIVERED) {
+                return ['success' => false, 'message' => 'Stop already delivered.'];
+            }
 
             $payloadByItemId = collect($linePayloads)
                 ->filter(fn ($line) => isset($line['shipment_item_id']))
@@ -1269,6 +1299,16 @@ class WarehouseDeliveryService
                 ->where('delivery_run_id', $run->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            /*
+             * Re-checked under the lock — see the note in driverConfirmStop. The
+             * entry guard reads a pre-transaction snapshot, so two confirmations
+             * racing on this stop both pass it; only this re-read stops the second
+             * from delivering the parcel again and creating a second commission.
+             */
+            if ($stop->status === DeliveryRunStop::STATUS_DELIVERED) {
+                return ['success' => false, 'message' => 'Stop already delivered.'];
+            }
 
             $runItems = DeliveryRunItem::query()
                 ->where('delivery_run_id', $run->id)
@@ -1585,6 +1625,29 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'This stop is not a bus handoff stop.'];
         }
 
+        /*
+         * A settled stop cannot be handed off again.
+         *
+         * This path had no stop-status guard at all — the weakest of the three
+         * confirm routes. Re-running it on a delivered stop set the stop back to
+         * `handed_off` and nulled `delivered_at`, moved the shipment items
+         * backwards from `delivered` to `handed_to_courier`, and appended a second
+         * set of tracking rows, so a completed delivery was silently reopened.
+         *
+         * `handed_off` is refused too: the app only offers this action for a
+         * `pending` or `arrived` stop, so a repeat is never a user flow — it is
+         * only ever a retry or a double-submit, and the second one would duplicate
+         * the tracking rows and re-run the confirmation service.
+         */
+        if (in_array($stop->status, [DeliveryRunStop::STATUS_DELIVERED, DeliveryRunStop::STATUS_HANDED_OFF], true)) {
+            return [
+                'success' => false,
+                'message' => $stop->status === DeliveryRunStop::STATUS_DELIVERED
+                    ? 'Stop already delivered.'
+                    : 'This stop has already been handed off.',
+            ];
+        }
+
         $courierName = isset($data['courier_name']) && trim((string) $data['courier_name']) !== ''
             ? trim((string) $data['courier_name'])
             : null;
@@ -1604,6 +1667,20 @@ class WarehouseDeliveryService
         return DB::transaction(function () use ($run, $stop, $driver, $data, $request, $courierName, $courierPhone, $vehicleNumber, $busStationName) {
             $run = DeliveryRun::query()->with(['items.shipmentItem.shipment', 'stops'])->lockForUpdate()->findOrFail($run->id);
             $stop = DeliveryRunStop::query()->whereKey($stop->id)->where('delivery_run_id', $run->id)->lockForUpdate()->firstOrFail();
+
+            /*
+             * Re-checked under the lock — the guard above reads the pre-transaction
+             * snapshot, so two handoffs racing on this stop would both pass it and
+             * the second would duplicate the tracking rows below.
+             */
+            if (in_array($stop->status, [DeliveryRunStop::STATUS_DELIVERED, DeliveryRunStop::STATUS_HANDED_OFF], true)) {
+                return [
+                    'success' => false,
+                    'message' => $stop->status === DeliveryRunStop::STATUS_DELIVERED
+                        ? 'Stop already delivered.'
+                        : 'This stop has already been handed off.',
+                ];
+            }
 
             if ($run->status === DeliveryRun::STATUS_ASSIGNED) {
                 $run->update(['status' => DeliveryRun::STATUS_OUT_FOR_DELIVERY, 'dispatched_at' => now()]);

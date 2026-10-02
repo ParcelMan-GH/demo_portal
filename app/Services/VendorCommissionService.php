@@ -195,16 +195,69 @@ class VendorCommissionService
             $lockedVendor = Vendor::withTrashed()->whereKey($vendor->getKey())->lockForUpdate()->first();
 
             /*
-             * Re-read the balance under that lock. Anything read before this point
-             * is a stale snapshot and must not be trusted for the decision.
+             * The records this payout may settle — locked as well as read, so they
+             * cannot move between the sum below and the allocation after it.
              */
-            $available = (float) VendorEarning::where('vendor_id', $vendor->id)
+            $earnings = VendorEarning::where('vendor_id', $vendor->id)
                 ->where('status', VendorEarning::STATUS_APPROVED)
                 ->whereNull('payout_id')
-                ->sum('amount');
+                ->oldest()
+                ->lockForUpdate()
+                ->get();
 
-            if ($amount > $available) {
-                return ['success' => false, 'message' => 'Payout amount exceeds available balance of GHS ' . number_format($available, 2)];
+            /*
+             * Re-read the balance under that lock, in pesewas. Anything read before
+             * this point is a stale snapshot and must not be trusted for the
+             * decision, and money is compared as integers so no float rounding can
+             * let through a payout the records do not cover.
+             */
+            $targetPesewas = (int) round($amount * 100);
+            $availablePesewas = (int) round(((float) $earnings->sum('amount')) * 100);
+
+            if ($targetPesewas > $availablePesewas) {
+                return ['success' => false, 'message' => 'Payout amount exceeds available balance of GHS ' . number_format($availablePesewas / 100, 2)];
+            }
+
+            /*
+             * Choose the records this payout settles — and refuse the amount when no
+             * set of whole records adds up to it.
+             *
+             * The allocation used to take records until the running total passed the
+             * payout and then stop, so a GHS 50 payout against records of 30 and 40
+             * settled BOTH: GHS 70 of commission consumed for GHS 50 of money, and
+             * the vendor quietly short by 20. Taking only what fits instead would
+             * leave the vendor apparently owed money they had already been paid.
+             *
+             * Commission is recorded per parcel and there is nowhere to record a
+             * half-settled one — `vendor_earnings.shipment_item_id` is unique, so the
+             * remainder cannot be split into a row of its own — which leaves refusing
+             * the amount as the only option that neither short-changes the vendor nor
+             * overstates what is still owed to them.
+             *
+             * Computed before the payout row is written, so a refused amount leaves
+             * no payout behind.
+             */
+            $settled = collect();
+            $settledPesewas = 0;
+            $firstUnsettledPesewas = null;
+
+            foreach ($earnings as $earning) {
+                $earningPesewas = (int) round(((float) $earning->amount) * 100);
+
+                if ($settledPesewas + $earningPesewas > $targetPesewas) {
+                    $firstUnsettledPesewas = $earningPesewas;
+                    break;
+                }
+
+                $settled->push($earning);
+                $settledPesewas += $earningPesewas;
+            }
+
+            if ($settledPesewas !== $targetPesewas) {
+                return [
+                    'success' => false,
+                    'message' => $this->settlementMismatchMessage($targetPesewas, $settledPesewas, $firstUnsettledPesewas, $availablePesewas),
+                ];
             }
 
             $confirmImmediately = (bool) ($data['confirm_immediately'] ?? false);
@@ -223,27 +276,47 @@ class VendorCommissionService
                 'confirmed_at' => $confirmImmediately ? $now : null,
             ]);
 
-            $remaining = $amount;
-            // Locked as well as read: the vendor lock already serialises payout
-            // attempts, and this keeps the rows themselves from moving between the
-            // sum above and the allocation below.
-            $earnings = VendorEarning::where('vendor_id', $vendor->id)
-                ->where('status', VendorEarning::STATUS_APPROVED)
-                ->whereNull('payout_id')
-                ->oldest()
-                ->lockForUpdate()
-                ->get();
-
-            foreach ($earnings as $earning) {
-                if ($remaining <= 0) break;
+            // Already chosen above, and already proven to sum to exactly this
+            // payout, so there is no running total left to overshoot with.
+            foreach ($settled as $earning) {
                 $earning->update(['payout_id' => $payout->id, 'status' => VendorEarning::STATUS_PAID]);
-                $remaining -= $earning->amount;
             }
 
             $message = $confirmImmediately ? 'Vendor paid successfully.' : 'Payout of GHS ' . number_format($amount, 2) . ' created.';
 
             return ['success' => true, 'message' => $message, 'data' => ['payout' => $payout]];
         });
+    }
+
+    /**
+     * Why an amount could not be settled, and what would settle instead.
+     *
+     * Names the two nearest amounts that do add up, rather than only refusing, so
+     * whoever is paying is not left working out the arithmetic from the ledger.
+     * All values arrive in pesewas.
+     */
+    private function settlementMismatchMessage(
+        int $targetPesewas,
+        int $settledPesewas,
+        ?int $firstUnsettledPesewas,
+        int $availablePesewas
+    ): string {
+        $money = fn (int $pesewas) => 'GHS ' . number_format($pesewas / 100, 2);
+
+        $options = [];
+
+        if ($settledPesewas > 0) {
+            $options[] = $money($settledPesewas);
+        }
+
+        if ($firstUnsettledPesewas !== null && $settledPesewas + $firstUnsettledPesewas <= $availablePesewas) {
+            $options[] = $money($settledPesewas + $firstUnsettledPesewas);
+        }
+
+        return $money($targetPesewas) . ' cannot be settled exactly: commission is recorded per parcel and paid in '
+            . 'whole records, and no set of them adds up to that amount.'
+            . ($options ? ' ' . (count($options) > 1 ? 'Amounts that would settle: ' : 'The nearest amount that would settle is ') . implode(' or ', $options) . '.' : '')
+            . ' Outstanding balance is ' . $money($availablePesewas) . '.';
     }
 
     public function markPayoutSent(VendorPayout $payout, string $reference, int $adminId): array

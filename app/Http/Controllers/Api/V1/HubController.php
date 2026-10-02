@@ -632,7 +632,18 @@ class HubController extends Controller
             ->whereIn('batch_number', CodeResolver::candidates((string) $batchNumber))
             ->first();
 
-        if (! $batch) {
+        /*
+         * Scoped to this hub, answering 404 rather than 403.
+         *
+         * The lookup above matched a batch number anywhere in the system — the
+         * only method in this controller with no hub filter — so a hub agent who
+         * knew or guessed a number could read another hub's full manifest, and
+         * `serializePackages` carries the recipients' names and phone numbers.
+         *
+         * 404 and not 403 on purpose: a 403 would confirm the batch exists, which
+         * turns this into a way to enumerate other hubs' consignments.
+         */
+        if (! $batch || ! $this->batchBelongsToHub($batch, $hub)) {
             return $this->failed("No batch found for {$batchNumber}.", 404);
         }
 
@@ -773,6 +784,40 @@ class HubController extends Controller
     private function destinationLabelForBatch(OutgoingBatch $batch): ?string
     {
         return $this->destinationLabel($batch->delivery_region_id, $batch->delivery_district_id);
+    }
+
+    /**
+     * Whether this hub has any business with this batch.
+     *
+     * Three ways it can, in the order they are cheapest to answer:
+     *
+     * 1. The batch is destined for this hub. This is the intake desk's case: the
+     *    transporter is bringing it here, so its parcels are not in this hub's
+     *    custody yet and an `atHub`-only test would lock the desk out of the very
+     *    manifest it is trying to check in.
+     * 2. It is destined here but the destination was never stamped. Older rows
+     *    predate `destination_warehouse_id`, and the destination still resolves
+     *    from the region and district — the same resolution used when the batch was
+     *    formed, so a legacy row is not stranded from its own hub.
+     * 3. It is holding parcels here right now, which is how the `batches` list
+     *    scopes and the only test that spans both directions of travel.
+     *
+     * Anything else is another hub's consignment.
+     */
+    private function batchBelongsToHub(OutgoingBatch $batch, Warehouse $hub): bool
+    {
+        if ((int) $batch->destination_warehouse_id === (int) $hub->id) {
+            return true;
+        }
+
+        if (
+            ! $batch->destination_warehouse_id
+            && (int) OutgoingBatch::resolveDestinationWarehouseId($batch->delivery_region_id, $batch->delivery_district_id) === (int) $hub->id
+        ) {
+            return true;
+        }
+
+        return $batch->shipmentItems()->atHub($hub->id)->exists();
     }
 
     /** @param  \Illuminate\Support\Collection<int, ShipmentItem>  $items */
