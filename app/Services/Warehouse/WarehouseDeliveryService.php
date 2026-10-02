@@ -534,11 +534,39 @@ class WarehouseDeliveryService
                 $stopsCount++;
             }
 
-            // Update shipment statuses to out_for_delivery
+            /*
+             * One `update()` per shipment, not a bulk update.
+             *
+             * `Shipment::whereIn(...)->update([...])` is a query-builder write and
+             * dispatches no model events, so `ShipmentObserver` never fired
+             * `ShipmentStatusChanged` on this path. The listeners that event drives
+             * — the vendor push, the customer email, the status SMS — therefore ran
+             * for an admin dispatch and silently skipped every rider-started run,
+             * so the recipient was never told their parcel had left.
+             *
+             * This is now the same write the admin path makes in
+             * `syncShipmentOutForDeliveryStatus`, so both routes emit the same
+             * events. The exclusions stay in the query as a filter, so a terminal
+             * shipment still cannot be moved backwards — it is simply never loaded.
+             *
+             * Safe inside this transaction because the notification services behind
+             * those listeners swallow their own failures: `EmailTemplateService::send`
+             * and `PushNotificationService::send` each catch Throwable and record the
+             * failure, so a dead SMS gateway cannot roll back the rider's start.
+             */
             $shipmentIds = $shipmentItems->pluck('shipment_id')->unique();
-            Shipment::whereIn('id', $shipmentIds)
-                ->whereNotIn('status', ['out_for_delivery', 'delivered', 'cancelled'])
-                ->update(['status' => ShipmentStatus::OUT_FOR_DELIVERY]);
+
+            Shipment::query()
+                ->whereIn('id', $shipmentIds)
+                ->whereNotIn('status', [
+                    ShipmentStatus::OUT_FOR_DELIVERY->value,
+                    ShipmentStatus::DELIVERED->value,
+                    ShipmentStatus::CANCELLED->value,
+                ])
+                ->get()
+                ->each(fn (Shipment $shipment) => $shipment->update([
+                    'status' => ShipmentStatus::OUT_FOR_DELIVERY,
+                ]));
 
             if (Schema::hasTable('rider_team_handover_items')) {
                 $handoverIds = RiderTeamHandoverItem::query()
@@ -1728,6 +1756,26 @@ class WarehouseDeliveryService
             return ['success' => false, 'message' => 'Delivery run is not active.'];
         }
 
+        /*
+         * A delivered stop is finished and cannot be re-failed.
+         *
+         * This guard was missing here while every sibling entry point had it —
+         * driverArriveStop, driverConfirmStop and driverConfirmStopByPackage all
+         * refuse a delivered stop. Without it, re-failing a stop that had already
+         * been delivered wrote its run items to `failed`, pushed the shipment item
+         * back to `at_destination`, appended duplicate tracking rows, and had
+         * `syncShipmentDeliveryStatus` drag the whole shipment backwards out of
+         * `delivered` — while the commission created at delivery was never
+         * reversed, so the two ledgers drifted apart.
+         *
+         * Reachable while the run is still `partially_delivered`; once every stop
+         * has settled the run becomes `completed` and the run-status check above
+         * refuses the call first.
+         */
+        if ($stop->status === DeliveryRunStop::STATUS_DELIVERED) {
+            return ['success' => false, 'message' => 'Stop already delivered.'];
+        }
+
         return DB::transaction(function () use ($run, $stop, $driver, $reason, $notes) {
             $run = DeliveryRun::query()
                 ->with(['items.shipmentItem.shipment', 'stops'])
@@ -1739,6 +1787,16 @@ class WarehouseDeliveryService
                 ->where('delivery_run_id', $run->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            /*
+             * Re-checked under the lock. The guard above reads the route-bound
+             * model, which is a snapshot taken before the transaction opened: a
+             * concurrent confirmation can deliver this stop in between, which is
+             * the same window the confirm paths close by re-reading under the lock.
+             */
+            if ($stop->status === DeliveryRunStop::STATUS_DELIVERED) {
+                return ['success' => false, 'message' => 'Stop already delivered.'];
+            }
 
             $runItems = DeliveryRunItem::query()
                 ->where('delivery_run_id', $run->id)

@@ -143,12 +143,19 @@ class VendorCommissionService
 
     public function createPayout(Vendor $vendor, float $amount, int $adminId, array $data = []): array
     {
-        $summary = $this->getVendorSummary($vendor);
-
-        if ($amount > $summary['available_balance']) {
-            return ['success' => false, 'message' => 'Payout amount exceeds available balance of GHS ' . number_format($summary['available_balance'], 2)];
-        }
-
+        /*
+         * No balance check here on purpose.
+         *
+         * It used to run at this point — outside any transaction, on a value read
+         * without a lock — and that was the whole defect: two submissions of the
+         * same amount both read the same approved balance, both passed, and both
+         * created a payout against earnings that only covered one of them. The
+         * vendor was paid twice. The authoritative check now lives inside the
+         * transaction below, under a row lock.
+         *
+         * `getVendorSummary` is still read for the messages it produces, but only
+         * after the lock is held.
+         */
         if ($amount < $this->getMinPayout()) {
             return ['success' => false, 'message' => 'Minimum payout amount is GHS ' . number_format($this->getMinPayout(), 2)];
         }
@@ -172,6 +179,34 @@ class VendorCommissionService
         }
 
         return DB::transaction(function () use ($vendor, $amount, $adminId, $data, $paymentMethod, $paymentPhone) {
+            /*
+             * Lock the vendor first.
+             *
+             * Locking the eligible earnings would be the obvious move, but it locks
+             * *nothing* when the vendor has none — and two simultaneous first-ever
+             * payouts are exactly the case that must not both succeed. Locking the
+             * vendor row serialises every payout attempt for this vendor, whatever
+             * their earnings look like.
+             *
+             * `withTrashed` because Vendor soft-deletes: without it a trashed
+             * vendor would lock no row and fall through to the unlocked behaviour
+             * this is here to prevent.
+             */
+            $lockedVendor = Vendor::withTrashed()->whereKey($vendor->getKey())->lockForUpdate()->first();
+
+            /*
+             * Re-read the balance under that lock. Anything read before this point
+             * is a stale snapshot and must not be trusted for the decision.
+             */
+            $available = (float) VendorEarning::where('vendor_id', $vendor->id)
+                ->where('status', VendorEarning::STATUS_APPROVED)
+                ->whereNull('payout_id')
+                ->sum('amount');
+
+            if ($amount > $available) {
+                return ['success' => false, 'message' => 'Payout amount exceeds available balance of GHS ' . number_format($available, 2)];
+            }
+
             $confirmImmediately = (bool) ($data['confirm_immediately'] ?? false);
             $now = now();
 
@@ -189,10 +224,14 @@ class VendorCommissionService
             ]);
 
             $remaining = $amount;
+            // Locked as well as read: the vendor lock already serialises payout
+            // attempts, and this keeps the rows themselves from moving between the
+            // sum above and the allocation below.
             $earnings = VendorEarning::where('vendor_id', $vendor->id)
                 ->where('status', VendorEarning::STATUS_APPROVED)
                 ->whereNull('payout_id')
                 ->oldest()
+                ->lockForUpdate()
                 ->get();
 
             foreach ($earnings as $earning) {
