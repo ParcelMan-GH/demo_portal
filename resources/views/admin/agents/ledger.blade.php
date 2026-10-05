@@ -27,6 +27,7 @@
                         <th class="px-6 py-4">Agent Name</th>
                         <th class="px-6 py-4">Task Quota</th>
                         <th class="px-6 py-4">Collection & Tier</th>
+                        <th class="px-6 py-4 text-center">Pickup Codes</th>
                         <th class="px-6 py-4 text-center">Payout Status</th>
                         <th class="px-6 py-4 text-right">Actions</th>
                     </tr>
@@ -56,6 +57,59 @@
                                 <div class="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Earned: ₵ {{ number_format($ledger['earned_commission'], 2) }}</div>
                             </td>
 
+                            {{--
+                                Pickup-code confirmation.
+
+                                A day's commission does not unlock until every parcel
+                                that requires a code has been confirmed. The split
+                                between agent-confirmed and admin-confirmed is shown
+                                deliberately: if the desk confirms everything on the
+                                agents' behalf, that has to look different from agents
+                                doing the work themselves.
+                            --}}
+                            <td class="px-6 py-4 text-center min-w-[190px]">
+                                @if($ledger['codes_required'] === 0)
+                                    <span class="text-xs font-medium text-slate-400 italic">
+                                        {{ $ledger['codes_exempt'] > 0 ? $ledger['codes_exempt'].' exempt' : 'None yet' }}
+                                    </span>
+                                @else
+                                    <div class="text-sm font-black {{ $ledger['codes_pending'] > 0 ? 'text-amber-600' : 'text-emerald-600' }}">
+                                        {{ $ledger['codes_confirmed'] }} / {{ $ledger['codes_required'] }}
+                                    </div>
+                                    <div class="flex flex-wrap items-center justify-center gap-1 mt-1.5">
+                                        @if($ledger['codes_confirmed_by_agent'] > 0)
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                {{ $ledger['codes_confirmed_by_agent'] }} agent
+                                            </span>
+                                        @endif
+                                        @if($ledger['codes_confirmed_by_admin'] > 0)
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                                                {{ $ledger['codes_confirmed_by_admin'] }} admin
+                                            </span>
+                                        @endif
+                                        @if($ledger['codes_pending'] > 0)
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                {{ $ledger['codes_pending'] }} to confirm
+                                            </span>
+                                        @endif
+                                        @if($ledger['codes_exempt'] > 0)
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200"
+                                                  title="Cancelled, returned, or unreachable after repeated attempts">
+                                                {{ $ledger['codes_exempt'] }} exempt
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    @if($ledger['codes_pending'] > 0)
+                                        <button type="button"
+                                                @click="openCodeModal({{ $ledger['id'] }}, '{{ addslashes($ledger['agent_name']) }}', @js($ledger['awaiting']))"
+                                                class="mt-2 text-xs font-bold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded-lg transition-colors">
+                                            Enter a code
+                                        </button>
+                                    @endif
+                                @endif
+                            </td>
+
                             {{-- Status Badge --}}
                             <td class="px-6 py-4 text-center" data-status-cell="{{ $ledger['id'] }}">
                                 @if($ledger['has_cleared_list'])
@@ -64,7 +118,10 @@
                                         Cleared
                                     </span>
                                 @elseif($ledger['is_unlocked'])
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Overridden by {{ $ledger['overridden_by'] }}">
+                                    {{-- The reason is shown on hover: an override with the
+                                         why recorded is auditable, one without is just a green light. --}}
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200"
+                                          title="Overridden by {{ $ledger['overridden_by'] ?? 'an admin' }}{{ $ledger['override_reason'] ? ' — '.$ledger['override_reason'] : '' }}">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/></svg>
                                         Override Active
                                     </span>
@@ -97,6 +154,14 @@
                             {{-- Actions --}}
                             <td class="px-6 py-4 text-right" data-action-cell="{{ $ledger['id'] }}">
                                 @if(!$ledger['has_cleared_list'] && !$ledger['is_unlocked'])
+                                    {{-- The override is the force path, so say plainly when it
+                                         would release money with parcels still unconfirmed.
+                                         That count is written to the audit log on submit. --}}
+                                    @if($ledger['codes_pending'] > 0)
+                                        <p class="text-[10px] font-bold text-amber-600 mb-1">
+                                            {{ $ledger['codes_pending'] }} code(s) unconfirmed
+                                        </p>
+                                    @endif
                                     <button @click="openOverrideModal({{ $ledger['id'] }}, '{{ addslashes($ledger['agent_name']) }}')" 
                                             class="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors">
                                         Override Lock
@@ -108,7 +173,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-12 text-center text-slate-400">
+                            <td colspan="6" class="px-6 py-12 text-center text-slate-400">
                                 <p class="text-sm font-bold">No agent quotas tracked for this date.</p>
                             </td>
                         </tr>
@@ -165,6 +230,88 @@
 </div>
 @endsection
 
+    {{--
+        Pickup-code entry.
+
+        The desk sees the code the recipient was texted, which is exactly why this
+        modal exists: the agent may not have been able to get it. Confirming here is
+        recorded as an ADMIN confirmation, never as the agent's own, so the ledger
+        keeps showing the difference between work the agents did and work the desk
+        did for them.
+    --}}
+    <div x-show="codeModalOpen" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center">
+        <div class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" @click="codeModalOpen = false" x-transition.opacity></div>
+
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100">
+
+            <div class="px-6 py-4 border-b border-slate-100">
+                <h3 class="text-lg font-black text-slate-900">Confirm a pickup code</h3>
+                <p class="text-xs text-slate-500 mt-0.5" x-text="'On behalf of ' + codeAgentName"></p>
+            </div>
+
+            <form :action="'{{ route('admin.agents.ledger.confirm-code', ['quota' => '__QUOTA_ID__']) }}'.replace('__QUOTA_ID__', codeQuotaId)"
+                  @submit.prevent="submitCode($event)" method="POST">
+                @csrf
+
+                <div class="px-6 py-5 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">Parcel</label>
+                        <select name="shipment_item_id" x-model="codeItemId" required
+                                class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                            <template x-for="p in codePending" :key="p.shipment_item_id">
+                                <option :value="p.shipment_item_id"
+                                        x-text="(p.tracking_code || ('#' + p.shipment_item_id)) + (p.recipient_name ? ' — ' + p.recipient_name : '')"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    {{--
+                        The issued code, shown so the desk can read it back to whoever
+                        they are on the phone with. It is only in this payload because
+                        the caller is an admin — the agent's endpoint never sends it.
+                    --}}
+                    <div x-show="selectedCode()" class="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">Code issued</span>
+                        <span class="text-lg font-black tracking-[0.2em] text-slate-900" x-text="selectedCode()"></span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">Code from the customer</label>
+                        <input type="text" name="code" x-model="codeValue" required inputmode="numeric" autocomplete="off"
+                               placeholder="e.g. 4821"
+                               class="w-full px-3 py-2.5 text-lg font-bold tracking-[0.2em] text-center border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1.5">Where did it come from?</label>
+                        <select name="source" x-model="codeSource"
+                                class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                            <option value="customer">The customer</option>
+                            <option value="hub_agent">The hub agent</option>
+                        </select>
+                    </div>
+
+                    <p x-show="codeError" x-text="codeError" class="text-xs font-bold text-red-600"></p>
+                </div>
+
+                <div class="px-6 py-4 bg-slate-50 flex justify-end gap-3">
+                    <button type="button" @click="codeModalOpen = false"
+                            class="px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" :disabled="codeSaving"
+                            class="px-5 py-2 text-sm font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl transition-colors disabled:opacity-50">
+                        <span x-show="!codeSaving">Confirm code</span>
+                        <span x-show="codeSaving">Confirming…</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 @push('scripts')
 <script>
 function commissionLedger() {
@@ -175,6 +322,89 @@ function commissionLedger() {
         
         savingOverride: false,
         overrideError: '',
+
+        // Pickup-code confirmation
+        codeModalOpen: false,
+        codeQuotaId: null,
+        codeAgentName: '',
+        codePending: [],
+        codeItemId: null,
+        codeValue: '',
+        codeSource: 'customer',
+        codeSaving: false,
+        codeError: '',
+
+        openCodeModal(id, name, pending) {
+            this.codeQuotaId = id;
+            this.codeAgentName = name;
+            this.codePending = Array.isArray(pending) ? pending : [];
+            this.codeItemId = this.codePending[0]?.shipment_item_id ?? null;
+            this.codeValue = '';
+            this.codeSource = 'customer';
+            this.codeError = '';
+            this.codeModalOpen = true;
+        },
+
+        /**
+         * The code issued for the selected parcel.
+         *
+         * Present only because this page is admin-only — the agent's own endpoint
+         * never sends the code, or the agent could simply read it back and retype it.
+         */
+        selectedCode() {
+            const row = this.codePending.find(p => String(p.shipment_item_id) === String(this.codeItemId));
+            return row?.pickup_code || '';
+        },
+
+        async submitCode(event) {
+            const form = event.target;
+            const quotaId = this.codeQuotaId;
+
+            this.codeSaving = true;
+            this.codeError = '';
+
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const post = () => fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': token,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: new FormData(form),
+            });
+
+            try {
+                let res = await post();
+                if (res.status === 419) res = await post();
+
+                const json = await res.json().catch(() => ({}));
+
+                if (!res.ok) {
+                    // The server says exactly why — the code did not match, the
+                    // attempts are exhausted, or the parcel has no code yet. Pass
+                    // that through rather than a generic failure.
+                    this.codeError = json.message || json.errors?.code?.[0] || 'Could not confirm that code.';
+                    return;
+                }
+
+                /*
+                 * Reloaded rather than patched in place.
+                 *
+                 * The override badge could be cloned from a <template> because its
+                 * markup already existed in the row. This cell has no such source:
+                 * the counts, the agent/admin split and the button are all
+                 * server-rendered, and rebuilding them here would mean a second copy
+                 * of that markup — the very drift the template comment warns about.
+                 * A reload is the honest way to get the numbers right.
+                 */
+                window.location.reload();
+            } catch (e) {
+                this.codeError = 'Could not reach the server. Check your connection and try again.';
+            } finally {
+                this.codeSaving = false;
+            }
+        },
 
         openOverrideModal(id, name) {
             this.selectedQuotaId = id;

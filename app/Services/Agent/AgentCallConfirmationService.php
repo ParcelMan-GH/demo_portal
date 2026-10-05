@@ -173,7 +173,14 @@ class AgentCallConfirmationService
      *
      * @return array{required: int, confirmed: int, exempt: int, pending: int, can_unlock: bool, pending_calls: array<int, array<string, mixed>>}
      */
-    public function stateForQuota(AgentDailyQuota $quota): array
+    /**
+     * @param  bool  $includeCodes  Whether to include the pickup codes themselves.
+     *   TRUE ONLY FOR ADMIN CALLERS. The agent must never receive the code in a
+     *   payload — handing it to them would let them read it and type it straight
+     *   back, which makes the whole gate decorative. The desk needs it precisely
+     *   because the agent may not have it.
+     */
+    public function stateForQuota(AgentDailyQuota $quota, bool $includeCodes = false): array
     {
         $agentId = (int) $quota->user_id;
         $day = Carbon::parse($quota->tracking_date)->toDateString();
@@ -188,6 +195,8 @@ class AgentCallConfirmationService
         $empty = [
             'required' => 0,
             'confirmed' => 0,
+            'confirmed_by_agent' => 0,
+            'confirmed_by_admin' => 0,
             'exempt' => 0,
             'pending' => 0,
             'can_unlock' => true,
@@ -205,6 +214,8 @@ class AgentCallConfirmationService
 
         $required = 0;
         $confirmed = 0;
+        $confirmedByAgent = 0;
+        $confirmedByAdmin = 0;
         $exempt = 0;
         $pending = [];
 
@@ -221,9 +232,25 @@ class AgentCallConfirmationService
                 continue;
             }
 
-            if ($this->isItemConfirmed((int) $itemId, $agentId)) {
+            $confirmingLog = AgentCallLog::query()
+                ->where('shipment_item_id', $itemId)
+                ->where('agent_id', $agentId)
+                ->whereNotNull('pickup_code_confirmed_at')
+                ->orderByDesc('pickup_code_confirmed_at')
+                ->first();
+
+            if ($confirmingLog) {
                 $required++;
                 $confirmed++;
+
+                // Split by who did it. The desk confirming everything on the
+                // agents' behalf must be visible, or it looks identical to agents
+                // doing the work themselves.
+                if ($confirmingLog->wasConfirmedByAdmin()) {
+                    $confirmedByAdmin++;
+                } else {
+                    $confirmedByAgent++;
+                }
 
                 continue;
             }
@@ -241,12 +268,14 @@ class AgentCallConfirmationService
             }
 
             $required++;
-            $pending[] = $this->pendingPayload($log, $item);
+            $pending[] = $this->pendingPayload($log, $item, $includeCodes);
         }
 
         return [
             'required' => $required,
             'confirmed' => $confirmed,
+            'confirmed_by_agent' => $confirmedByAgent,
+            'confirmed_by_admin' => $confirmedByAdmin,
             'exempt' => $exempt,
             'pending' => count($pending),
             'can_unlock' => $pending === [],
@@ -409,7 +438,7 @@ class AgentCallConfirmationService
     /**
      * @return array<string, mixed>
      */
-    private function pendingPayload(?AgentCallLog $log, ShipmentItem $item): array
+    private function pendingPayload(?AgentCallLog $log, ShipmentItem $item, bool $includeCode = false): array
     {
         return [
             'call_log_id' => $log?->getKey(),
@@ -423,6 +452,13 @@ class AgentCallConfirmationService
             'status' => $item->status instanceof ItemStatus ? $item->status->value : (string) $item->status,
             'outcome' => $log?->outcome,
             'called_at' => optional($log?->created_at)->toIso8601String(),
+            /*
+             * Only ever present for an admin caller. This key is the difference
+             * between a gate and a formality: an agent holding the code would simply
+             * read it back, so it must not appear in the agent's payload at all —
+             * not blanked, not nulled, absent.
+             */
+            'pickup_code' => $includeCode ? $item->pickup_code : null,
             /*
              * The parcel's attempts, not this call's — the limit the agent is
              * actually held to. One extra query per row, which is bounded by how

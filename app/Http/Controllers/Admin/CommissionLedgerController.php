@@ -42,7 +42,10 @@ class CommissionLedgerController extends Controller
                  * agent they are clear while the desk sees them blocked, or the
                  * reverse.
                  */
-                $state = $this->confirmations->stateForQuota($quota);
+                // includeCodes: true — the desk is allowed to see the code, because
+                // the whole point of the admin confirmation is to help when the
+                // agent cannot get it. The agent's own endpoint passes false.
+                $state = $this->confirmations->stateForQuota($quota, true);
 
                 return [
                     'id'               => $quota->id,
@@ -57,12 +60,14 @@ class CommissionLedgerController extends Controller
                     'overridden_by'    => $quota->overriddenBy->name ?? null,
 
                     // Pickup-code confirmation, added with this feature.
-                    'codes_required'   => $state['required'],
-                    'codes_confirmed'  => $state['confirmed'],
-                    'codes_exempt'     => $state['exempt'],
-                    'codes_pending'    => $state['pending'],
-                    'can_unlock'       => $state['can_unlock'],
-                    'awaiting'         => $state['pending_calls'],
+                    'codes_required'          => $state['required'],
+                    'codes_confirmed'         => $state['confirmed'],
+                    'codes_confirmed_by_agent'=> $state['confirmed_by_agent'],
+                    'codes_confirmed_by_admin'=> $state['confirmed_by_admin'],
+                    'codes_exempt'            => $state['exempt'],
+                    'codes_pending'           => $state['pending'],
+                    'can_unlock'              => $state['can_unlock'],
+                    'awaiting'                => $state['pending_calls'],
                 ];
             });
 
