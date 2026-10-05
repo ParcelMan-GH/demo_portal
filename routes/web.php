@@ -64,6 +64,9 @@ Route::prefix('agent')->name('agent.')->group(function () {
 // Commission Ledger & Overrides
 Route::get('/agents/ledger', [CommissionLedgerController::class, 'index'])->name('admin.agents.ledger');
 Route::post('/agents/ledger/{quota}/override', [CommissionLedgerController::class, 'override'])->name('admin.agents.ledger.override');
+// The desk's fallback for confirming a parcel's pickup code when the agent cannot
+// reach the recipient. Recorded as an admin confirmation, never as the agent's own.
+Route::post('/agents/ledger/{quota}/confirm-code', [CommissionLedgerController::class, 'confirmCode'])->name('admin.agents.ledger.confirm-code');
 
 // Smart Allocation Panel
 Route::get('/agents/allocation', [AgentAllocationController::class, 'index'])->name('admin.agents.allocation');

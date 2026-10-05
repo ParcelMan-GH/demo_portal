@@ -54,6 +54,35 @@ class AgentCallLog extends Model
         'canceled' => self::OUTCOME_CANCELLED,
     ];
 
+    /** The agent was given the code by the recipient. */
+    public const CODE_SOURCE_CUSTOMER = 'customer';
+
+    /** The agent was given the code by the hub agent holding the parcel. */
+    public const CODE_SOURCE_HUB_AGENT = 'hub_agent';
+
+    /**
+     * Where a pickup code may come from.
+     *
+     * Both are accepted — the agent is expected to phone the recipient, and the
+     * hub agent is a legitimate fallback when the recipient cannot be reached.
+     * They are recorded separately because they are not equally strong evidence:
+     * a hub agent always knows the code, so a run of hub-sourced confirmations is
+     * the signal that this step is being short-cut. Cheap to capture now and
+     * impossible to recover later if it is not.
+     *
+     * @var array<int, string>
+     */
+    public const CODE_SOURCES = [
+        self::CODE_SOURCE_CUSTOMER,
+        self::CODE_SOURCE_HUB_AGENT,
+    ];
+
+    /** Confirmed by the contact agent themself. */
+    public const CONFIRMED_BY_AGENT = 'agent';
+
+    /** Confirmed by an admin on the agent's behalf. */
+    public const CONFIRMED_BY_ADMIN = 'admin';
+
     /**
      * @var array<int, string>
      */
@@ -65,6 +94,12 @@ class AgentCallLog extends Model
         'amount_paid',
         'payment_proof_path',
         'rescheduled_for',
+        'pickup_code_confirmed_at',
+        'pickup_code_source',
+        'pickup_code_confirmed_by',
+        'pickup_code_confirmed_by_user_id',
+        'pickup_code_confirmed_before_release',
+        'pickup_code_attempts',
     ];
 
     /**
@@ -73,6 +108,9 @@ class AgentCallLog extends Model
     protected $casts = [
         'amount_paid' => 'decimal:2',
         'rescheduled_for' => 'datetime',
+        'pickup_code_confirmed_at' => 'datetime',
+        'pickup_code_confirmed_before_release' => 'boolean',
+        'pickup_code_attempts' => 'integer',
     ];
 
     /**
@@ -95,9 +133,32 @@ class AgentCallLog extends Model
         return $this->outcome === self::OUTCOME_CONFIRMED;
     }
 
+    /**
+     * Whether the agent has confirmed this call against the parcel's pickup code.
+     *
+     * Distinct from `isConfirmedPayment()`: that records what the recipient said on
+     * the phone, this records that the codes matched. A day's commission is gated
+     * on this one.
+     */
+    public function isPickupCodeConfirmed(): bool
+    {
+        return $this->pickup_code_confirmed_at !== null;
+    }
+
+    /** Confirmed by an admin rather than by the agent. */
+    public function wasConfirmedByAdmin(): bool
+    {
+        return $this->pickup_code_confirmed_by === self::CONFIRMED_BY_ADMIN;
+    }
+
     public function shipmentItem(): BelongsTo
     {
         return $this->belongsTo(ShipmentItem::class);
+    }
+
+    public function confirmedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pickup_code_confirmed_by_user_id');
     }
 
     public function agent(): BelongsTo

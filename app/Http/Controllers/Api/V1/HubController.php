@@ -13,6 +13,7 @@ use App\Models\ShipmentItemTracking;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\HubBusHandoffService;
+use App\Services\PushNotificationService;
 use App\Services\SmsService;
 use App\Services\StorageService;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +34,10 @@ class HubController extends Controller
      * The bus handoff side of the app. Batch dispatch goes through it so a
      * whole-load handover writes the same record and evidence as a single one.
      */
-    public function __construct(private HubBusHandoffService $busHandoffs) {}
+    public function __construct(
+        private HubBusHandoffService $busHandoffs,
+        private PushNotificationService $pushService,
+    ) {}
 
     /**
      * Statuses that mean "this parcel is physically sitting in the hub".
@@ -375,6 +379,10 @@ class HubController extends Controller
                 if ($sent) {
                     $notified++;
                     $smsStatus = 'sent';
+
+                    // The desk gets the same code the recipient just received, so
+                    // it can help confirm a delivery the agent cannot close.
+                    $this->notifyAdminsOfPickupCode($item, $hub);
                 } else {
                     $notificationFailed++;
                     $smsStatus = 'failed';
@@ -471,6 +479,12 @@ class HubController extends Controller
             $hub->name,
             $item->pickup_code
         ));
+
+        if ($sent) {
+            // Same code to the desk, so an agent who cannot reach the recipient
+            // can be helped without re-issuing the code.
+            $this->notifyAdminsOfPickupCode($item, $hub);
+        }
 
         $this->logTracking(
             $item,
@@ -1063,6 +1077,50 @@ class HubController extends Controller
         }
 
         return (string) random_int(100000, 999999);
+    }
+
+    /**
+     * Tell the admins the code the recipient was just texted.
+     *
+     * The desk needs it because the contact agent's commission now depends on the
+     * same code being confirmed, and an agent who cannot reach the recipient has to
+     * be able to ask someone who already has it. Sent only after the recipient's own
+     * text actually went out, so the desk is never told about a code the customer
+     * never received.
+     *
+     * Failures are swallowed for the same reason as everywhere else on this path: a
+     * push gateway must never undo a physical check-in.
+     */
+    private function notifyAdminsOfPickupCode(ShipmentItem $item, Warehouse $hub): void
+    {
+        if (blank($item->pickup_code)) {
+            return;
+        }
+
+        try {
+            $this->pushService->sendToAllAdmins(
+                'Pickup code issued',
+                sprintf(
+                    '%s at %s — pickup code %s for parcel %s.',
+                    $item->delivery_recipient_name ?: 'Recipient',
+                    $hub->name,
+                    $item->pickup_code,
+                    $item->tracking_code ?: $item->id
+                ),
+                [
+                    'shipment_item_id' => (string) $item->id,
+                    'pickup_code' => (string) $item->pickup_code,
+                    'tracking_code' => (string) ($item->tracking_code ?: $item->id),
+                    'source' => 'hub_pickup_code',
+                ],
+                'pickup_code'
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Admin pickup-code push failed', [
+                'shipment_item_id' => $item->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

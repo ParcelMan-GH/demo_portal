@@ -146,6 +146,14 @@ Route::prefix('v1/agent')->middleware(['auth:sanctum', 'role:contact_agent'])->g
     Route::post('/parcels/call-log', [AgentParcelController::class, 'logCall']);
     Route::get('/calls/history', [AgentParcelController::class, 'callHistory']);
 
+    /*
+     * Confirming the parcel's pickup code — the same code the recipient quotes to
+     * the hub agent. A day's commission does not unlock until every call that
+     * requires it has been confirmed.
+     */
+    Route::get('/calls/to-confirm', [AgentParcelController::class, 'callsToConfirm']);
+    Route::post('/calls/{callLog}/confirm-code', [AgentParcelController::class, 'confirmCallCode']);
+
     Route::get('/notifications', [AgentParcelController::class, 'notifications']);
     Route::post('/notifications/read-all', [AgentParcelController::class, 'markAllNotificationsRead']);
     Route::post('/notifications/settings', [AgentParcelController::class, 'updateNotificationSettings']);

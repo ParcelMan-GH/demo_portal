@@ -11,6 +11,7 @@ use App\Models\CommissionTier;
 use App\Models\NotificationLog;
 use App\Models\OutgoingBatchAssignmentEvent;
 use App\Models\ShipmentItem;
+use App\Services\Agent\AgentCallConfirmationService;
 use App\Services\OutgoingBatchAutoAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -749,7 +750,7 @@ class AgentParcelController extends Controller
      * or not, while `available_balance` counts only the unlocked days. Nothing
      * in the schema records a "paid" state, so unlocked is read as payable.
      */
-    public function earnings(Request $request)
+    public function earnings(Request $request, AgentCallConfirmationService $confirmations)
     {
         $agent = $request->user();
 
@@ -817,6 +818,18 @@ class AgentParcelController extends Controller
                     ->whereDoesntHave('agentCallLogs', fn ($query) => $query->where('agent_id', $agent->id))
                     ->count(),
                 'has_remaining_tasks' => $ledgerPending > 0,
+
+                /*
+                 * Parcels still waiting on a pickup-code confirmation. One number
+                 * rather than per-day detail, so the app can badge its "To Confirm"
+                 * tab without this endpoint doing a per-quota lookup for each of the
+                 * fifty days it renders.
+                 *
+                 * This is what gates the day's commission, so the screen needs it
+                 * to explain why a day is still locked.
+                 */
+                'pending_confirmations' => $pendingConfirmations = $confirmations->countPendingForAgent((int) $agent->id),
+                'has_pending_confirmations' => $pendingConfirmations > 0,
 
                 'activities' => $activities,
             ],
@@ -893,6 +906,112 @@ class AgentParcelController extends Controller
             OutgoingBatchAutoAssignmentService::RESULT_ALREADY_BATCHED => 'Payment confirmed. '.$batching['message'],
             default => 'Payment confirmed, but the parcel could not be batched: '.$batching['message'],
         };
+    }
+
+    /**
+     * The parcels this agent still has to confirm with a pickup code.
+     *
+     * GET /api/v1/agent/calls/to-confirm — the list behind the app's "To Confirm"
+     * screen. One row per parcel rather than per call, because the agent has one
+     * code to enter however many times they rang.
+     *
+     * Everything that decides membership lives in AgentCallConfirmationService, so
+     * this list and the admin ledger cannot disagree about what is outstanding.
+     */
+    public function callsToConfirm(Request $request, AgentCallConfirmationService $confirmations)
+    {
+        $agent = $request->user();
+        $items = $confirmations->pendingPayloadsForAgent((int) $agent->id);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'items' => $items,
+                'total' => count($items),
+            ],
+            // Also at the top level: the app's client returns the body, and older
+            // builds read `calls` directly.
+            'calls' => $items,
+        ]);
+    }
+
+    /**
+     * Confirm a call against the parcel's pickup code.
+     *
+     * POST /api/v1/agent/calls/{callLog}/confirm-code
+     *
+     * The code is the same one the recipient quotes to the hub agent, so this
+     * compares it exactly as `HubController::release` does.
+     */
+    public function confirmCallCode(
+        Request $request,
+        AgentCallLog $callLog,
+        AgentCallConfirmationService $confirmations
+    ) {
+        $agent = $request->user();
+
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:64'],
+            /*
+             * Where the code came from. Optional so a build that predates this
+             * field still works, but recorded when sent — the two sources are not
+             * equally strong evidence (a hub agent always knows the code), and that
+             * distinction cannot be recovered later if it is not captured now.
+             */
+            'source' => ['nullable', 'string', 'in:customer,hub_agent'],
+        ]);
+
+        /*
+         * Only your own call. Without this an agent could confirm another agent's
+         * parcel, which is precisely what the gate exists to prevent.
+         */
+        if ((int) $callLog->agent_id !== (int) $agent->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This call belongs to another agent.',
+            ], 403);
+        }
+
+        $result = $confirmations->verify($callLog, (string) $validated['code']);
+
+        if (! $result['ok']) {
+            // Burn an attempt only for a genuinely wrong code — see verify().
+            if ($result['counts_as_attempt']) {
+                $confirmations->recordFailedAttempt($callLog);
+            }
+
+            // Counted per parcel, not per call — the limit the agent is actually
+            // held to (see AgentCallConfirmationService::totalCodeAttempts).
+            $attempts = $confirmations->totalCodeAttempts(
+                (int) $callLog->shipment_item_id,
+                (int) $callLog->agent_id
+            );
+
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+                'attempts_remaining' => max(0, AgentCallConfirmationService::MAX_CODE_ATTEMPTS - $attempts),
+            ], 422);
+        }
+
+        $confirmed = $confirmations->confirm(
+            $callLog,
+            (string) ($validated['source'] ?? AgentCallLog::CODE_SOURCE_CUSTOMER),
+            AgentCallLog::CONFIRMED_BY_AGENT,
+            (int) $agent->id,
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup code confirmed.',
+            'data' => [
+                'call_log_id' => $confirmed->getKey(),
+                'shipment_item_id' => $confirmed->shipment_item_id,
+                'confirmed_at' => optional($confirmed->pickup_code_confirmed_at)->toIso8601String(),
+                'source' => $confirmed->pickup_code_source,
+                'confirmed_by' => $confirmed->pickup_code_confirmed_by,
+            ],
+        ]);
     }
 
     /**
