@@ -43,6 +43,9 @@ class HubBusHandoff extends Model
         'hub_id',
         'outgoing_batch_id',
         'handed_off_by',
+        'handoff_agent_name',
+        'handoff_agent_phone',
+        'delivery_fee',
         'driver_name',
         'driver_phone',
         'driver_id_number',
@@ -71,6 +74,7 @@ class HubBusHandoff extends Model
             'sms_sent_at' => 'datetime',
             'sms_failed_at' => 'datetime',
             'proof_photo_size' => 'integer',
+            'delivery_fee' => 'decimal:2',
         ];
     }
 

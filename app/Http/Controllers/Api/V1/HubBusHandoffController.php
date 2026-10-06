@@ -207,6 +207,12 @@ class HubBusHandoffController extends Controller
             'driver_name' => ['required', 'string', 'max:120'],
             'driver_phone' => ['nullable', 'string', 'max:30'],
             'driver_id_number' => ['nullable', 'string', 'max:60'],
+            // The agent meeting the bus at the far end, and the fee agreed for
+            // the leg. Both optional: a handover recorded without them is still a
+            // valid record, and the SMS simply omits what was not captured.
+            'handoff_agent_name' => ['nullable', 'string', 'max:120'],
+            'handoff_agent_phone' => ['nullable', 'string', 'max:30'],
+            'delivery_fee' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'vehicle_plate' => ['nullable', 'string', 'max:30'],
             'vehicle_description' => ['nullable', 'string', 'max:120'],
             'bus_company' => ['nullable', 'string', 'max:120'],

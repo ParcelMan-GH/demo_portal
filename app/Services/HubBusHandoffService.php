@@ -216,6 +216,11 @@ class HubBusHandoffService
                 'outgoing_batch_id' => $item->outgoing_batch_id,
                 'handed_off_by' => $agent->id,
                 'driver_name' => $attributes['driver_name'],
+                'handoff_agent_name' => $attributes['handoff_agent_name'] ?? null,
+                'handoff_agent_phone' => $attributes['handoff_agent_phone'] ?? null,
+                'delivery_fee' => isset($attributes['delivery_fee']) && $attributes['delivery_fee'] !== ''
+                    ? round((float) $attributes['delivery_fee'], 2)
+                    : null,
                 'driver_phone' => $attributes['driver_phone'] ?? null,
                 'driver_id_number' => $attributes['driver_id_number'] ?? null,
                 'vehicle_plate' => $attributes['vehicle_plate'] ?? null,
@@ -411,8 +416,19 @@ class HubBusHandoffService
         $smsSent = 0;
 
         foreach ($notify as $handoff) {
-            if (($this->notifyCustomer($handoff)['sent'] ?? false) === true) {
-                $this->notifyVendor($handoff);
+            /*
+             * The two are independent, not nested.
+             *
+             * The vendor notification used to sit inside the customer's success
+             * branch, so a recipient with no phone on file — or one failed send —
+             * silently meant the vendor was told nothing either. The vendor is the
+             * party accountable for the parcel, so their alert must not depend on
+             * the recipient's.
+             */
+            $customerSent = ($this->notifyCustomer($handoff)['sent'] ?? false) === true;
+            $vendorResult = $this->notifyVendor($handoff);
+
+            if ($customerSent || ($vendorResult['sms'] ?? false) === true) {
                 $smsSent++;
             }
         }
@@ -451,6 +467,48 @@ class HubBusHandoffService
      *
      * @return array{sent: bool, phone: string|null, error: string|null}
      */
+    /**
+     * The handover message both the customer and the vendor receive.
+     *
+     * Segments are dropped rather than left blank. A handover recorded without a
+     * fee or a handoff agent would otherwise text "Delivery Fee: GHS ." and
+     * "Handoff Agent: ()" — worse than saying nothing, because it reads as data
+     * that was lost rather than never captured.
+     */
+    private function handoffMessage(HubBusHandoff $handoff): string
+    {
+        $handoff->loadMissing('shipmentItem');
+        $item = $handoff->shipmentItem;
+
+        $tracking = $item?->tracking_code ?: 'Your parcel';
+
+        $driver = trim((string) $handoff->driver_name);
+        $driverBits = array_filter([
+            filled($handoff->driver_phone) ? (string) $handoff->driver_phone : null,
+            filled($handoff->vehicle_plate) ? 'Plate: '.$handoff->vehicle_plate : null,
+        ]);
+        $driverLine = $driver
+            .($driverBits ? ' ('.implode(', ', $driverBits).')' : '');
+
+        $message = "Parcel {$tracking} handed to driver "
+            .($driverLine !== '' ? $driverLine : 'the bus driver')
+            .($handoff->destination ? " for {$handoff->destination}" : '')
+            .'.';
+
+        if ($handoff->delivery_fee !== null) {
+            $message .= ' Delivery Fee: GHS '.number_format((float) $handoff->delivery_fee, 2).'.';
+        }
+
+        $agentName = trim((string) $handoff->handoff_agent_name);
+        if ($agentName !== '') {
+            $message .= ' Handoff Agent: '.$agentName
+                .(filled($handoff->handoff_agent_phone) ? ' ('.$handoff->handoff_agent_phone.')' : '')
+                .'.';
+        }
+
+        return 'ParcelMan: '.$message;
+    }
+
     public function notifyCustomer(HubBusHandoff $handoff): array
     {
         $handoff->loadMissing('shipmentItem');
@@ -466,12 +524,15 @@ class HubBusHandoffService
 
         $token = $this->issuePublicLink($handoff);
         $link = $this->urlForToken($token);
-        $tracking = $handoff->shipmentItem?->tracking_code ?: 'your package';
 
         // The reduced dispatch form no longer always captures a photo, so only
         // promise one when the handoff has it. The link opens the handover
         // either way (the public page hides the photo block when there is none).
-        $message = "ParcelMan: {$tracking} has been handed to the bus. "
+        // The full detail line, plus the link — the link is the reason this text
+        // exists (it opens the handover photo), so it is kept rather than replaced
+        // by the richer wording.
+        $message = $this->handoffMessage($handoff)
+            .' '
             .(filled($handoff->proof_photo_path)
                 ? 'See the photo of the handover: '
                 : 'Follow the handover: ')
@@ -545,7 +606,7 @@ class HubBusHandoffService
                     $link = $this->urlForToken($this->issuePublicLink($handoff));
                     $smsSent = $this->smsService->send(
                         PhoneHelper::format($phone) ?? $phone,
-                        "ParcelMan: {$body}Handover details: {$link}"
+                        $this->handoffMessage($handoff).' Handover details: '.$link
                     );
                 } catch (\Throwable $e) {
                     report($e);
@@ -687,6 +748,17 @@ class HubBusHandoffService
                 'description' => $handoff->vehicle_description,
                 'company' => $handoff->bus_company,
             ],
+            // The agent meeting the bus at the far end, and the fee agreed for the
+            // leg. Masked on the public page exactly like the driver's phone: the
+            // public link is opened from an SMS and can be forwarded.
+            'handoff_agent' => [
+                'name' => $handoff->handoff_agent_name,
+                'phone' => $public ? $this->maskPhone($handoff->handoff_agent_phone) : $handoff->handoff_agent_phone,
+            ],
+            'delivery_fee' => $handoff->delivery_fee !== null ? (float) $handoff->delivery_fee : null,
+            'delivery_fee_label' => $handoff->delivery_fee !== null
+                ? 'GHS '.number_format((float) $handoff->delivery_fee, 2)
+                : null,
             'destination' => $handoff->destination,
             // Both tolerate a handoff with no photo: `filled()` is false for a
             // null path, and `photoUrl()` returns null for one, so a batch sent
