@@ -157,6 +157,16 @@ class AgentCommissionController extends Controller
                     'next_band' => $this->nextBand($quota),
                 ]),
                 'line_items' => $this->lineItems($agent->id, $quota, $earned),
+                /*
+                 * Parcels whose commission this day lost to the 72-hour SLA.
+                 *
+                 * Its own block rather than only a flag on the rows above: a parcel
+                 * can be forfeited on a day whose call never produced a line item
+                 * (it was never marked `confirmed`), and a forfeiture the agent
+                 * cannot see anywhere is indistinguishable from one that never
+                 * happened. This is the "Expired / Forfeited" list.
+                 */
+                'forfeited_items' => $this->forfeitedItems($agent->id, $quota),
                 'totals' => [
                     'collected' => $this->money((float) $quota->collected_amount),
                     'earned' => $this->money($earned),
@@ -243,6 +253,27 @@ class AgentCommissionController extends Controller
                 'base_rate_value' => round($payout, 2),
                 'marginal_earned' => $this->money($marginal),
                 'marginal_earned_value' => round($marginal, 2),
+
+                /*
+                 * Whether this parcel's commission was forfeited under the 72-hour
+                 * SLA. The row and its amounts are left exactly as they were — the
+                 * clock ran out, it did not never-happen — and the flag is what lets
+                 * the app mark it.
+                 *
+                 * The band arithmetic above is deliberately untouched. Removing a
+                 * forfeited parcel's contribution from the running total would
+                 * re-band every later call and change what the agent earned for
+                 * parcels that are not forfeited, which would take money from one
+                 * parcel as a side effect of another's forfeiture.
+                 */
+                'forfeited' => $forfeited = $this->isForfeited($item),
+                'forfeited_reason' => $forfeited ? $item->commission_expiry_reason : null,
+                'forfeited_at' => $forfeited
+                    ? optional($item->commission_expired_at)->toIso8601String()
+                    : null,
+                'reinstated_at' => $item?->commission_expiry_reversed_at
+                    ? optional($item->commission_expiry_reversed_at)->toIso8601String()
+                    : null,
             ];
         }
 
@@ -406,6 +437,71 @@ class AgentCommissionController extends Controller
      * Format an amount the way the agent app already renders money ("GH₵ 12.00"),
      * so a populated value and the app's own fallback look identical.
      */
+    /**
+     * Whether a parcel's commission is forfeited right now.
+     *
+     * A reversed forfeiture is not a forfeiture: the admin's reinstatement
+     * outranks the timer, so `reversed_at` being set clears the flag. Both
+     * timestamps stay on the row so the history remains readable.
+     */
+    private function isForfeited(?ShipmentItem $item): bool
+    {
+        if (! $item) {
+            return false;
+        }
+
+        return $item->commission_expired_at !== null
+            && $item->commission_expiry_reversed_at === null;
+    }
+
+    /**
+     * Forfeitures attributable to one agent-day.
+     *
+     * Attributed by the day the *call* was logged, not the day the timer fired.
+     * The credit being removed is the credit this day's calls produced, so that is
+     * where the loss belongs; filing it under the day the sweeper happened to run
+     * would show a forfeiture on a day the agent did nothing.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function forfeitedItems(int $agentId, AgentDailyQuota $quota): array
+    {
+        $itemIds = AgentCallLog::query()
+            ->where('agent_id', $agentId)
+            ->whereDate('created_at', $quota->tracking_date->toDateString())
+            ->whereNotNull('shipment_item_id')
+            ->distinct()
+            ->pluck('shipment_item_id');
+
+        if ($itemIds->isEmpty()) {
+            return [];
+        }
+
+        return ShipmentItem::query()
+            ->whereIn('id', $itemIds)
+            ->whereNotNull('commission_expired_at')
+            ->orderBy('commission_expired_at')
+            ->get()
+            ->map(fn (ShipmentItem $item) => [
+                'shipment_item_id' => $item->getKey(),
+                'tracking_code' => $item->tracking_code,
+                'recipient_name' => $item->delivery_recipient_name,
+                'expired_at' => optional($item->commission_expired_at)->toIso8601String(),
+                'reason' => $item->commission_expiry_reason,
+                'reason_label' => $item->commission_expiry_reason === 'cap_10'
+                    ? '10-unconfirmed cap'
+                    : '72-hour SLA',
+                'source' => $item->commission_expiry_source,
+                // Reinstated by an admin: shown struck through rather than hidden,
+                // because the agent was told it was lost and should be told it was
+                // given back.
+                'reinstated' => $item->commission_expiry_reversed_at !== null,
+                'reinstated_at' => optional($item->commission_expiry_reversed_at)->toIso8601String(),
+                'note' => $item->commission_expiry_note,
+            ])
+            ->all();
+    }
+
     private function money(float $amount): string
     {
         return 'GH₵ '.number_format($amount, 2);

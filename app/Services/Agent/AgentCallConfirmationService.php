@@ -6,6 +6,7 @@ use App\Enums\ItemStatus;
 use App\Models\AgentCallLog;
 use App\Models\AgentDailyQuota;
 use App\Models\ShipmentItem;
+use App\Services\Agent\AgentCommissionExpirationService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -97,7 +98,57 @@ class AgentCallConfirmationService
             return false;
         }
 
+        /*
+         * The customer collected it at the hub. The desk verified the same code
+         * before handing the parcel over, so the agent's confirmation has nothing
+         * left to prove — and requiring it would leave a parcel the customer
+         * already has sitting in the agent's queue, blocking the day it belongs to.
+         *
+         * This is the real-time half of the rule: hub release writes `released_at`
+         * and DELIVERED in one update, so the next read of this list drops the
+         * parcel with no separate sync job to fall out of step.
+         */
+        if ($this->isSettledAtHub($item)) {
+            return false;
+        }
+
+        // Already forfeited under the 72-hour SLA. It has stopped blocking the day;
+        // re-listing it would put a parcel the agent can no longer be paid for back
+        // in front of them.
+        if ($this->isForfeited($item)) {
+            return false;
+        }
+
         return ! $this->isExemptLog($log);
+    }
+
+    /**
+     * Whether the parcel was collected at the hub by the recipient.
+     *
+     * Requires both `released_at` and DELIVERED, because a rider handover sets
+     * `released_at` with OUT_FOR_DELIVERY and does *not* verify the pickup code.
+     * Treating that as settled would let an agent's obligation evaporate the moment
+     * the parcel left the counter on a rider's bike, which is exactly the window
+     * where a customer call still matters.
+     */
+    public function isSettledAtHub(ShipmentItem $item): bool
+    {
+        if ($item->released_at === null) {
+            return false;
+        }
+
+        $status = $item->status instanceof ItemStatus ? $item->status->value : (string) $item->status;
+
+        return $status === ItemStatus::DELIVERED->value;
+    }
+
+    /**
+     * Whether the parcel's commission has been forfeited and not reinstated.
+     */
+    public function isForfeited(ShipmentItem $item): bool
+    {
+        return $item->commission_expired_at !== null
+            && $item->commission_expiry_reversed_at === null;
     }
 
     /**
@@ -198,6 +249,8 @@ class AgentCallConfirmationService
             'confirmed_by_agent' => 0,
             'confirmed_by_admin' => 0,
             'exempt' => 0,
+            'settled_at_hub' => 0,
+            'forfeited' => 0,
             'pending' => 0,
             'can_unlock' => true,
             'pending_calls' => [],
@@ -217,6 +270,8 @@ class AgentCallConfirmationService
         $confirmedByAgent = 0;
         $confirmedByAdmin = 0;
         $exempt = 0;
+        $settledAtHub = 0;
+        $forfeited = 0;
         $pending = [];
 
         foreach ($itemIds as $itemId) {
@@ -229,6 +284,29 @@ class AgentCallConfirmationService
             // No code minted yet: not required. Nothing is owed for a parcel that
             // has not reached a destination hub.
             if (blank($item->pickup_code)) {
+                continue;
+            }
+
+            /*
+             * Collected at the hub by the recipient. The desk verified the code, so
+             * this is discharged and must not hold up the day. Checked before the
+             * confirmation lookup because it is the stronger fact: it does not
+             * matter whether the agent ever entered the code themselves.
+             */
+            if ($this->isSettledAtHub($item)) {
+                $settledAtHub++;
+
+                continue;
+            }
+
+            /*
+             * Forfeited under the 72-hour SLA. It has stopped blocking the day —
+             * that is the whole point of the rule — and it is reported separately
+             * so the shortfall is visible rather than silently shrinking `required`.
+             */
+            if ($this->isForfeited($item)) {
+                $forfeited++;
+
                 continue;
             }
 
@@ -277,7 +355,18 @@ class AgentCallConfirmationService
             'confirmed_by_agent' => $confirmedByAgent,
             'confirmed_by_admin' => $confirmedByAdmin,
             'exempt' => $exempt,
+            // Discharged because the recipient collected at the desk.
+            'settled_at_hub' => $settledAtHub,
+            // Forfeited under the SLA. Reported so the day is not just "unlockable"
+            // with a quietly smaller total — the shortfall is the point.
+            'forfeited' => $forfeited,
             'pending' => count($pending),
+            /*
+             * Forfeited parcels deliberately do not appear in `pending`, so a day
+             * whose only outstanding parcels have timed out becomes unlockable.
+             * Without that the SLA would resolve nothing: the deadlock it exists to
+             * break is exactly this flag staying false forever.
+             */
             'can_unlock' => $pending === [],
             'pending_calls' => $pending,
         ];
@@ -466,6 +555,28 @@ class AgentCallConfirmationService
              */
             'attempts' => $attempts = $this->totalCodeAttempts((int) $item->id, (int) ($log?->agent_id ?? 0)),
             'attempts_remaining' => max(0, self::MAX_CODE_ATTEMPTS - $attempts),
+
+            /*
+             * The countdown the agent app shows on the card ("Expires in 18h").
+             *
+             * Computed from `arrived_at_hub_at` because that is where the clock
+             * starts — the code is minted in the same write, so hub arrival is the
+             * first moment a confirmation was possible at all.
+             *
+             * The constant is read off the expiry service rather than copied, and
+             * read as a class constant so it does not need the service injected:
+             * injecting it would be circular, since the expiry service takes this
+             * one as a dependency.
+             */
+            'expires_at' => $expiresAt = $item->arrived_at_hub_at
+                ? \Illuminate\Support\Carbon::parse($item->arrived_at_hub_at)
+                    ->addHours(AgentCommissionExpirationService::SLA_HOURS)
+                    ->toIso8601String()
+                : null,
+            'hours_remaining' => $item->arrived_at_hub_at
+                ? round(\Illuminate\Support\Carbon::now()
+                    ->diffInMinutes(\Illuminate\Support\Carbon::parse($expiresAt), false) / 60, 1)
+                : null,
         ];
     }
 }

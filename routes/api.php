@@ -151,6 +151,7 @@ Route::prefix('v1/agent')->middleware(['auth:sanctum', 'role:contact_agent'])->g
      * the hub agent. A day's commission does not unlock until every call that
      * requires it has been confirmed.
      */
+    Route::get('/calls/summary', [AgentParcelController::class, 'callsSummary']);
     Route::get('/calls/to-confirm', [AgentParcelController::class, 'callsToConfirm']);
     Route::post('/calls/{callLog}/confirm-code', [AgentParcelController::class, 'confirmCallCode']);
 

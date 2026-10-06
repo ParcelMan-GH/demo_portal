@@ -10,6 +10,30 @@ use App\Services\Warehouse\WarehouseTransportService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
+
+/*
+ * The 72-hour commission SLA.
+ *
+ * Hourly rather than daily: the window is measured in hours, so a daily pass would
+ * leave a parcel forfeit-able for up to 24 hours past its deadline, and the
+ * agent's "Expires in 3h" badge would contradict the ledger for that whole gap.
+ *
+ * No --backfill, deliberately. The scheduled run applies the rule going forward;
+ * reaching backwards into parcels that predate the rule is a decision for a human,
+ * because it forfeits commission that was already earned.
+ *
+ * withoutOverlapping because a sweep holds item row locks while it works, and two
+ * runs racing would contend for the same rows for no benefit.
+ *
+ * NOTE: this fires only if the server's scheduler is actually invoked —
+ *   * * * * * cd <app> && /opt/plesk/php/8.4/bin/php artisan schedule:run
+ * A registered schedule with no cron behind it is silent, and looks exactly like
+ * nobody ever being late.
+ */
+Schedule::command('agents:expire-commissions')
+    ->hourly()
+    ->withoutOverlapping();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

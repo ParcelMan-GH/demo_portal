@@ -48,6 +48,14 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\TransportManifest::observe(\App\Observers\TransportManifestObserver::class);
         \App\Models\DeliveryRunStop::observe(\App\Observers\DeliveryRunStopObserver::class);
         \App\Models\DeliveryRunItem::observe(\App\Observers\DeliveryRunItemObserver::class);
+        /*
+         * The parcel-level status observer. Attached to the model so that every
+         * writer of `shipment_items.status` reaches the vendor — hub intake, bus
+         * dispatch, hub release, warehouse and rider scans, admin corrections —
+         * rather than only the writers that remembered to notify. Without it the
+         * entire hub leg was silent to the vendor.
+         */
+        \App\Models\ShipmentItem::observe(\App\Observers\ShipmentItemObserver::class);
 
         // Register authorization gates for permissions
         $this->registerPermissionGates();

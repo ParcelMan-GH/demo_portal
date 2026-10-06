@@ -13,6 +13,7 @@ use App\Events\PickupAssignmentStatusChanged;
 use App\Events\ShipmentCollected;
 use App\Events\ShipmentReadyForCollection;
 use App\Events\ShipmentStatusChanged;
+use App\Events\ShipmentItemStatusChanged;
 use App\Events\TransportManifestStatusChanged;
 use App\Events\VendorRegistered;
 use App\Events\WalkinShipmentReceived;
@@ -30,6 +31,7 @@ use App\Listeners\SendShipmentStatusSms;
 use App\Listeners\SendCollectionNotifications;
 use App\Listeners\SendCustomerEmailTemplateNotification;
 use App\Listeners\SendVendorShipmentNotification;
+use App\Listeners\SendVendorItemStatusNotification;
 use App\Listeners\SendWalkinShipmentNotifications;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use App\Models\RecipientPaymentTask;
@@ -46,6 +48,18 @@ class EventServiceProvider extends ServiceProvider
             // Customer texts on picked_up / in_transit / out_for_delivery /
             // delivered, plus the vendor text on delivered.
             SendShipmentStatusSms::class,
+        ],
+
+        /*
+         * The parcel-level leg. Separate from the block above because
+         * ShipmentStatusChanged only fires when the *shipment's* status changes,
+         * and the hub path never changes it — it writes `shipment_items.status`
+         * alone. That is why the vendor previously heard nothing between intake and
+         * collection; this pairing is what closes it, giving the vendor both an
+         * inbox row and a text for each parcel transition.
+         */
+        ShipmentItemStatusChanged::class => [
+            SendVendorItemStatusNotification::class,
         ],
 
         

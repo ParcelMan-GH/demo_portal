@@ -12,6 +12,7 @@ use App\Models\NotificationLog;
 use App\Models\OutgoingBatchAssignmentEvent;
 use App\Models\ShipmentItem;
 use App\Services\Agent\AgentCallConfirmationService;
+use App\Services\Agent\AgentCommissionExpirationService;
 use App\Services\OutgoingBatchAutoAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -932,6 +933,48 @@ class AgentParcelController extends Controller
             // Also at the top level: the app's client returns the body, and older
             // builds read `calls` directly.
             'calls' => $items,
+        ]);
+    }
+
+    /**
+     * How this agent stands against the confirmation rules, for the dashboard.
+     *
+     * GET /api/v1/agent/calls/summary
+     *
+     * Feeds the "Unconfirmed parcels: X / 10" counter and the countdown on the
+     * cards. `unconfirmed` is parcels still owed a confirmation whatever their age;
+     * `at_cap` is the escalation signal once that reaches the cap. `expired` counts
+     * forfeited parcels so the dashboard can say what the SLA has already cost,
+     * rather than the number only ever going down with no explanation.
+     *
+     * Read from the expiry service rather than counted here, so the app, the
+     * ledger and the sweeper cannot disagree about how many parcels are outstanding.
+     */
+    public function callsSummary(
+        Request $request,
+        AgentCommissionExpirationService $expiry,
+        AgentCallConfirmationService $confirmations
+    ) {
+        $agent = $request->user();
+        $agentId = (int) $agent->id;
+
+        $state = $expiry->stateForAgent($agentId);
+
+        // The countdown data lives on the confirm list itself, so the app can show
+        // "Expires in 18h" per card without a second request. This endpoint only
+        // carries the headline numbers.
+        $pending = count($confirmations->pendingPayloadsForAgent($agentId));
+
+        return response()->json([
+            'success' => true,
+            'data' => array_merge($state, [
+                // Outstanding right now, which is what the badge shows. Equals
+                // `unconfirmed` by construction — both come from the same rule —
+                // but named for the screen so the app does not have to guess.
+                'pending' => $pending,
+                'sla_hours' => AgentCommissionExpirationService::SLA_HOURS,
+                'cap' => AgentCommissionExpirationService::UNCONFIRMED_CAP,
+            ]),
         ]);
     }
 
