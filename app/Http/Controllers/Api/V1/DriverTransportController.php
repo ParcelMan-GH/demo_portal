@@ -219,13 +219,33 @@ class DriverTransportController extends Controller
             if ($isHistory) {
                 $query->where($driverCol, $driver->id)
                       ->whereIn('status', TransportManifest::STATUSES_HISTORY);
-            } else {
+            } elseif ($search !== '') {
+                /*
+                 * A lookup, not a list.
+                 *
+                 * The app resolves a scanned manifest code through this same
+                 * endpoint (`/driver/transports?search=CODE`) and claims it from
+                 * there, so a code the driver does not own yet has to stay
+                 * findable — otherwise scanning could never claim anything.
+                 */
                 $query->where(function ($q) use ($driver, $driverCol) {
                     $q->where($driverCol, $driver->id)
                       ->orWhereNull($driverCol)
                       ->orWhere($driverCol, 0)
                       ->orWhere($driverCol, '');
                 });
+            } else {
+                /*
+                 * The plain list is this driver's own work and nothing else.
+                 *
+                 * It used to fold unowned manifests in "so a driver can see a
+                 * batch waiting to be claimed" — which put every draft and every
+                 * unassigned manifest on every transporter's phone, including
+                 * runs for regions they do not work. Ownership is claimed by
+                 * *scanning the manifest code*, not by browsing a list, so the
+                 * list has no business showing work that is not assigned here.
+                 */
+                $query->where($driverCol, $driver->id);
             }
 
             if ($search !== '') {
