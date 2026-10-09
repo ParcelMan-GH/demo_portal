@@ -32,7 +32,13 @@ class PhoneNumber
         }
 
         if (str_starts_with($digits, '0')) {
+            // The national trunk prefix is dropped in favour of the country code,
+            // so `0551234567` and `+233551234567` describe the same subscriber.
             $digits = '233'.substr($digits, 1);
+        } elseif (strlen($digits) === 9) {
+            // A bare nine-digit subscriber number, e.g. `551234567`, which is the
+            // local number with both the trunk zero and the country code missing.
+            $digits = '233'.$digits;
         }
 
         return '+'.$digits;

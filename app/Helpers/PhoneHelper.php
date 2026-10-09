@@ -2,6 +2,8 @@
 
 namespace App\Helpers;
 
+use App\Support\PhoneNumber;
+
 class PhoneHelper
 {
     /**
@@ -19,29 +21,20 @@ class PhoneHelper
     public static function format(string $phone): ?string
     {
         // Remove all non-numeric characters except +
-        $phone = preg_replace('/[^0-9+]/', '', $phone);
+        $stripped = preg_replace('/[^0-9+]/', '', $phone);
 
-        // If already in +233 format
-        if (preg_match('/^\+233[0-9]{9}$/', $phone)) {
-            return $phone;
+        /*
+         * Keep this method's contract — null means "not a Ghana number" — so every
+         * caller that treats the return value as a validity check is unaffected.
+         * The actual `0…` / `233…` / `+233…` normalisation is delegated to
+         * App\Support\PhoneNumber, so all phone handling in the app shares one
+         * implementation instead of two that can drift apart.
+         */
+        if (!preg_match('/^(\+?233[0-9]{9}|0[0-9]{9}|[2-9][0-9]{8})$/', (string) $stripped)) {
+            return null; // Invalid format
         }
 
-        // If in 233xxxxxxxxx format (without +)
-        if (preg_match('/^233[0-9]{9}$/', $phone)) {
-            return '+' . $phone;
-        }
-
-        // If in 0xxxxxxxxx format (local with leading 0)
-        if (preg_match('/^0[0-9]{9}$/', $phone)) {
-            return '+233' . substr($phone, 1);
-        }
-
-        // If in xxxxxxxxx format (9 digits, no leading 0)
-        if (preg_match('/^[2-9][0-9]{8}$/', $phone)) {
-            return '+233' . $phone;
-        }
-
-        return null; // Invalid format
+        return PhoneNumber::normalise($stripped);
     }
 
     /**

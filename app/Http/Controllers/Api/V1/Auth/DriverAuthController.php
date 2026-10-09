@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\PhoneNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -22,14 +23,15 @@ class DriverAuthController extends Controller
             'role' => ['required', 'string', 'in:transporter,rider'],
         ]);
 
-        // Normalize phone number search
-        $phone = preg_replace('/[^0-9]/', '', $request->phone);
-
-        $user = User::query()
-            ->where(function ($q) use ($phone, $request) {
-                $q->where('phone', $request->phone)
-                  ->orWhere('phone', 'like', "%{$phone}");
-            })
+        /*
+         * The users.phone column is not uniform (`+233…` and `0…` both occur), so
+         * the lookup goes through PhoneNumber: it normalises whatever the driver
+         * typed and compares on the subscriber number. The previous
+         * `orWhere('phone', 'like', "%{$phone}")` never matched a stored
+         * `+233551234567` for a driver typing `0551234567`, so the local form
+         * could not sign in at all.
+         */
+        $user = PhoneNumber::match(User::query(), (string) $request->phone)
             ->with(['roles', 'warehouse'])
             ->first();
 

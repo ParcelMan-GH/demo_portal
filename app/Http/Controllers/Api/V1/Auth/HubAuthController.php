@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\PhoneNumber;
 use App\Services\StorageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -35,13 +36,10 @@ class HubAuthController extends Controller
             'fcm_token' => ['nullable', 'string'],
         ]);
 
-        $digits = preg_replace('/[^0-9]/', '', $validated['phone']);
-
-        $user = User::query()
-            ->where(function ($query) use ($validated, $digits) {
-                $query->where('phone', $validated['phone'])
-                    ->orWhere('phone', 'like', "%{$digits}");
-            })
+        // PhoneNumber normalises the typed number and matches across the two
+        // shapes users.phone holds. The previous `like "%024…"` search missed a
+        // stored `+233…` row, so an agent typing the local form could not sign in.
+        $user = PhoneNumber::match(User::query(), (string) $validated['phone'])
             ->with(['roles', 'warehouse'])
             ->first();
 

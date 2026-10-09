@@ -335,6 +335,12 @@ class DriverTransportController extends Controller
                 ->whereIn('status', TransportManifest::STATUSES_HISTORY)
                 ->count();
             $totalBatches = TransportManifest::where($driverCol, $driver->id)->count();
+            // Batches still in this driver's hands — assigned, loading or on the
+            // road. Different question from `total_batches`, which is all-time, so
+            // the overview shows both side by side.
+            $activeBatches = TransportManifest::where($driverCol, $driver->id)
+                ->whereIn('status', TransportManifest::STATUSES_ACTIVE)
+                ->count();
             $exceptions = 0;
 
             if (class_exists(TransportLoadingException::class)) {
@@ -419,6 +425,9 @@ class DriverTransportController extends Controller
                 'metrics' => [
                     'drives_made' => $drivesMade,
                     'total_batches' => $totalBatches,
+                    'active_batches' => $activeBatches,
+                    // Left in place: existing app builds still read it, and the
+                    // overview no longer needs it rather than the field being wrong.
                     'exceptions' => $exceptions,
                 ],
                 'data' => $recent,
