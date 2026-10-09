@@ -7,12 +7,14 @@ use App\Enums\ItemStatus;
 use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\District;
+use App\Models\HubAgentCommission;
 use App\Models\OutgoingBatch;
 use App\Models\Region;
 use App\Models\ShipmentItem;
 use App\Models\ShipmentItemTracking;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\Hub\HubAgentCommissionService;
 use App\Services\HubBusHandoffService;
 use App\Services\PushNotificationService;
 use App\Services\SmsService;
@@ -38,6 +40,10 @@ class HubController extends Controller
     public function __construct(
         private HubBusHandoffService $busHandoffs,
         private PushNotificationService $pushService,
+        // The hub agent's per-parcel commission (inbound on check-in, outbound on
+        // release). See the service for why this is separate from the contact
+        // agent's banded ladder.
+        private HubAgentCommissionService $hubCommissions,
     ) {}
 
     /**
@@ -276,40 +282,21 @@ class HubController extends Controller
         $pendingNotifications = [];
 
         foreach ($items as $item) {
-            // Re-scanning a parcel is normal at a busy desk: report it, don't
-            // move it or stamp it twice.
-            if ($item->isAtHub((int) $hub->id) && $item->arrived_at_hub_at) {
-                $alreadyAtHub[] = $this->serializePackage($item, $hub);
+            /*
+             * The per-parcel write lives in `checkInItem()` so this batch path and
+             * the single-parcel `intakePackage()` path cannot drift apart — they
+             * write the same status, stamp, pickup code, tracking row and inbound
+             * commission credit for one item.
+             */
+            $outcome = $this->checkInItem($item, $hub, $user, $batch, $validated['shelf_location'] ?? null);
+
+            if ($outcome['already']) {
+                $alreadyAtHub[] = $outcome['package'];
 
                 continue;
             }
 
-            // Whether the code predates this intake decides the duplicate rule: a
-            // code minted just now has never been texted, so it is always safe to
-            // send, whereas one that already existed may have gone out on an
-            // earlier arrival and must not be repeated.
-            $codeExisted = filled($item->pickup_code);
-
-            $item->update([
-                'hub_id' => $hub->id,
-                'arrived_at_hub_at' => $item->arrived_at_hub_at ?? now(),
-                'status' => ItemStatus::ARRIVED_AT_HUB->value,
-                'shelf_location' => $validated['shelf_location'] ?? $item->shelf_location,
-                'pickup_code' => $item->pickup_code ?: $this->generatePickupCode(),
-            ]);
-
-            $this->logTracking(
-                $item,
-                ItemStatus::ARRIVED_AT_HUB,
-                $hub,
-                $batch
-                    ? "Checked in at {$hub->name} for batch {$batch->batch_number}"
-                    : "Checked in at {$hub->name}",
-                ['source' => 'hub_intake', 'batch_number' => $batch?->batch_number],
-                (int) $user->id
-            );
-
-            $pendingNotifications[] = ['item' => $item, 'code_existed' => $codeExisted];
+            $pendingNotifications[] = $outcome['pending'];
         }
 
         // A batch is only "received" once every parcel in it is physically at
@@ -377,47 +364,18 @@ class HubController extends Controller
             } else {
                 $attempts++;
 
-                try {
-                    $sent = $smsService->send($phone, sprintf(
-                        'ParcelMan: your parcel %s has arrived at %s. Collect it with pickup code %s.',
-                        $item->tracking_code ?: $item->id,
-                        $hub->name,
-                        $item->pickup_code
-                    ));
-                } catch (\Throwable $e) {
-                    // A gateway blow-up must never undo a physical check-in.
-                    Log::warning('Pickup SMS threw during hub intake', [
-                        'shipment_item_id' => $item->id,
-                        'error' => $e->getMessage(),
-                    ]);
-
-                    $sent = false;
-                }
+                // Extracted so the single-parcel check-in sends the identical
+                // message, records the identical tracking row, and tells the desk
+                // in the identical way.
+                $sent = $this->sendPickupCodeSms($item, $hub, (int) $user->id, $smsService);
 
                 if ($sent) {
                     $notified++;
                     $smsStatus = 'sent';
-
-                    // The desk gets the same code the recipient just received, so
-                    // it can help confirm a delivery the agent cannot close.
-                    $this->notifyAdminsOfPickupCode($item, $hub);
                 } else {
                     $notificationFailed++;
                     $smsStatus = 'failed';
                 }
-
-                // Same audit shape notifyRecipient writes, so the activity feed
-                // reads consistently and a later retry can see this code was sent.
-                $this->logTracking(
-                    $item,
-                    ItemStatus::ARRIVED_AT_HUB,
-                    $hub,
-                    $sent
-                        ? "Pickup code texted to {$item->delivery_recipient_name}"
-                        : "Pickup code to {$item->delivery_recipient_name} could not be texted",
-                    ['source' => 'hub_intake_sms', 'sent' => $sent],
-                    (int) $user->id
-                );
             }
 
             // The per-item outcome travels with the parcel so the app can tell the
@@ -451,6 +409,105 @@ class HubController extends Controller
                 'deferred' => $deferred,
                 'packages' => $received,
                 'already_at_hub' => $alreadyAtHub,
+            ],
+        ]);
+    }
+
+    /**
+     * Check ONE parcel into the hub, by its own barcode/tracking code.
+     *
+     * The hub desk scans the individual parcels in a batch, not the batch
+     * container, so this is the endpoint its scanner calls. It performs exactly
+     * the same writes as one item of a batch intake — the status change, the
+     * `arrived_at_hub_at` stamp, the pickup code, the tracking row and the pickup
+     * SMS — because it runs through the same `checkInItem()` helper — and it
+     * credits the hub agent's INBOUND commission at the configured rate.
+     *
+     * The batch endpoint is deliberately left in place: a batch can still be
+     * taken in whole, and this endpoint does not disturb the batch's own status
+     * (which the batch path flips only once every parcel is present).
+     */
+    public function intakePackage(Request $request, SmsService $smsService): JsonResponse
+    {
+        $validated = $request->validate([
+            'barcode' => ['nullable', 'string', 'max:120'],
+            'tracking_code' => ['nullable', 'string', 'max:120'],
+            'package_id' => ['nullable'],
+            'shelf_location' => ['nullable', 'string', 'max:60'],
+        ]);
+
+        $user = $request->user();
+        $hub = $user->warehouse;
+
+        if (! $hub) {
+            return $this->failed('No hub is assigned to this account. Ask an administrator to assign you to a hub.', 403);
+        }
+
+        $code = $validated['barcode'] ?? $validated['tracking_code'] ?? $validated['package_id'] ?? null;
+
+        if (! $code) {
+            return $this->failed('Provide a package barcode to check in.', 422);
+        }
+
+        $item = $this->findItemByCode($code);
+
+        if (! $item) {
+            return $this->failed("No package found for {$code}.", 404);
+        }
+
+        // The parcel's own batch, when it has one, so the tracking note reads the
+        // same as it would during a batch intake. The batch status is left alone:
+        // this desk scans parcels one at a time, and the batch only flips to
+        // "received" when every parcel in it is physically present — a decision
+        // the batch endpoint owns.
+        $batch = $item->outgoing_batch_id
+            ? OutgoingBatch::query()->find($item->outgoing_batch_id)
+            : null;
+
+        $outcome = $this->checkInItem($item, $hub, $user, $batch, $validated['shelf_location'] ?? null);
+
+        if ($outcome['already']) {
+            // A re-scan is normal at a busy desk. Report it; do not move it, stamp
+            // it or pay the inbound commission a second time.
+            return response()->json([
+                'success' => true,
+                'message' => "{$this->parcelLabel($item)} is already at {$hub->name}.",
+                'data' => [
+                    'hub' => $this->serializeHub($hub),
+                    'package' => $outcome['package'],
+                    'already_at_hub' => true,
+                    'sms_status' => 'already_at_hub',
+                    'commission' => $this->commissionResponse(
+                        $outcome['commission'],
+                        HubAgentCommission::DIRECTION_INBOUND
+                    ),
+                ],
+            ]);
+        }
+
+        // Text the recipient, now the check-in write is committed. No batch budget
+        // here on purpose: this endpoint handles exactly one parcel, and the desk
+        // wants to know at once whether the customer was told.
+        $item = $item->fresh();
+        $smsStatus = 'skipped_no_phone';
+
+        if (filled($item->delivery_recipient_phone)) {
+            $sent = $this->sendPickupCodeSms($item, $hub, (int) $user->id, $smsService);
+            $smsStatus = $sent ? 'sent' : 'failed';
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$this->parcelLabel($item)} checked in at {$hub->name}.",
+            'data' => [
+                'hub' => $this->serializeHub($hub),
+                'package' => $this->serializePackage($item, $hub) + ['sms_status' => $smsStatus],
+                'already_at_hub' => false,
+                'sms_status' => $smsStatus,
+                'commission' => $this->commissionResponse(
+                    $outcome['commission'],
+                    HubAgentCommission::DIRECTION_INBOUND
+                ),
             ],
         ]);
     }
@@ -946,6 +1003,18 @@ class HubController extends Controller
             (int) $user->id
         );
 
+        // OUTBOUND commission: GHC 1.00 by default, once per item. This is the
+        // counter handover — one of the two release paths. The doorstep dispatch
+        // below writes the same credit through the same service, and the ledger's
+        // unique index guarantees a parcel never earns outbound twice however it
+        // leaves.
+        $outbound = $this->hubCommissions->credit(
+            $item,
+            $hub,
+            $user,
+            HubAgentCommission::DIRECTION_OUTBOUND,
+        );
+
         return response()->json([
             'success' => true,
             'message' => $toRecipient
@@ -955,6 +1024,7 @@ class HubController extends Controller
                 'hub' => $this->serializeHub($hub),
                 'package' => $this->serializePackage($item->fresh(), $hub),
                 'counts' => $this->hubCounts($hub),
+                'commission' => $this->commissionResponse($outbound, HubAgentCommission::DIRECTION_OUTBOUND),
             ],
         ]);
     }
@@ -1052,6 +1122,17 @@ class HubController extends Controller
             (int) $user->id
         );
 
+        // OUTBOUND commission: GHC 1.00 by default, once per item. This is the
+        // doorstep dispatch — the other release path. The counter handover above
+        // writes the same credit, and the ledger's unique index stops a parcel
+        // being paid outbound twice if it is somehow taken through both.
+        $outbound = $this->hubCommissions->credit(
+            $item,
+            $hub,
+            $user,
+            HubAgentCommission::DIRECTION_OUTBOUND,
+        );
+
         return response()->json([
             'success' => true,
             'message' => "Package dispatched to {$validated['rider_name']} for doorstep delivery.",
@@ -1059,6 +1140,7 @@ class HubController extends Controller
                 'hub' => $this->serializeHub($hub),
                 'package' => $this->serializePackage($item->fresh(), $hub),
                 'counts' => $this->hubCounts($hub),
+                'commission' => $this->commissionResponse($outbound, HubAgentCommission::DIRECTION_OUTBOUND),
             ],
         ]);
     }
@@ -1283,6 +1365,152 @@ class HubController extends Controller
             'created_by' => $userId,
             'created_at' => now(),
         ]);
+    }
+
+    /**
+     * The check-in writes for ONE parcel: shared by the batch intake and the
+     * single-parcel check-in so the two cannot drift apart.
+     *
+     * Performs the status change, the `arrived_at_hub_at` stamp, the pickup code
+     * allocation, the tracking row and the INBOUND commission credit — the same
+     * set of writes the batch path made inline before this was extracted.
+     *
+     * A parcel already at this hub is reported and left untouched (and not
+     * credited again). The returned `commission` is the credit written for this
+     * call, or null when none was written (already here, feature off, or a
+     * direction with no rate).
+     *
+     * @return array{already: bool, package: array<string, mixed>|null, pending: array<string, mixed>|null, commission: HubAgentCommission|null}
+     */
+    private function checkInItem(
+        ShipmentItem $item,
+        Warehouse $hub,
+        User $user,
+        ?OutgoingBatch $batch,
+        ?string $shelfLocation,
+    ): array {
+        // Re-scanning a parcel is normal at a busy desk: report it, don't move it
+        // or stamp it twice — and never pay the inbound commission again.
+        if ($item->isAtHub((int) $hub->id) && $item->arrived_at_hub_at) {
+            return [
+                'already' => true,
+                'package' => $this->serializePackage($item, $hub),
+                'pending' => null,
+                'commission' => null,
+            ];
+        }
+
+        // Whether the code predates this intake decides the duplicate rule: a code
+        // minted just now has never been texted, so it is always safe to send,
+        // whereas one that already existed may have gone out on an earlier arrival
+        // and must not be repeated.
+        $codeExisted = filled($item->pickup_code);
+
+        $item->update([
+            'hub_id' => $hub->id,
+            'arrived_at_hub_at' => $item->arrived_at_hub_at ?? now(),
+            'status' => ItemStatus::ARRIVED_AT_HUB->value,
+            'shelf_location' => $shelfLocation ?? $item->shelf_location,
+            'pickup_code' => $item->pickup_code ?: $this->generatePickupCode(),
+        ]);
+
+        $this->logTracking(
+            $item,
+            ItemStatus::ARRIVED_AT_HUB,
+            $hub,
+            $batch
+                ? "Checked in at {$hub->name} for batch {$batch->batch_number}"
+                : "Checked in at {$hub->name}",
+            ['source' => 'hub_intake', 'batch_number' => $batch?->batch_number],
+            (int) $user->id
+        );
+
+        // INBOUND commission: GHC 0.50 by default, once per item. The guard above
+        // stops a re-scan reaching here, and the ledger's unique index backstops a
+        // genuine race, so a duplicate can never be paid.
+        $commission = $this->hubCommissions->credit(
+            $item,
+            $hub,
+            $user,
+            HubAgentCommission::DIRECTION_INBOUND,
+        );
+
+        return [
+            'already' => false,
+            'package' => null,
+            'pending' => ['item' => $item, 'code_existed' => $codeExisted],
+            'commission' => $commission,
+        ];
+    }
+
+    /**
+     * Text one recipient their pickup code and record the attempt.
+     *
+     * A gateway blow-up must never undo a physical check-in, so the send is
+     * wrapped and a throw is reported as "not sent" rather than propagated. On a
+     * successful send the desk is also told the code (see
+     * `notifyAdminsOfPickupCode`); either way a tracking row is written, so the
+     * activity feed and the duplicate-send guard (`pickupSmsAlreadySent`) can see
+     * what happened. Returns true only when the gateway accepted the message.
+     */
+    private function sendPickupCodeSms(ShipmentItem $item, Warehouse $hub, int $userId, SmsService $smsService): bool
+    {
+        try {
+            $sent = $smsService->send($item->delivery_recipient_phone, sprintf(
+                'ParcelMan: your parcel %s has arrived at %s. Collect it with pickup code %s.',
+                $item->tracking_code ?: $item->id,
+                $hub->name,
+                $item->pickup_code
+            ));
+        } catch (\Throwable $e) {
+            // A gateway blow-up must never undo a physical check-in.
+            Log::warning('Pickup SMS threw during hub intake', [
+                'shipment_item_id' => $item->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $sent = false;
+        }
+
+        if ($sent) {
+            // The desk gets the same code the recipient just received, so it can
+            // help confirm a delivery the agent cannot close.
+            $this->notifyAdminsOfPickupCode($item, $hub);
+        }
+
+        // Same audit shape notifyRecipient writes, so the activity feed reads
+        // consistently and a later retry can see this code was sent.
+        $this->logTracking(
+            $item,
+            ItemStatus::ARRIVED_AT_HUB,
+            $hub,
+            $sent
+                ? "Pickup code texted to {$item->delivery_recipient_name}"
+                : "Pickup code to {$item->delivery_recipient_name} could not be texted",
+            ['source' => 'hub_intake_sms', 'sent' => $sent],
+            $userId
+        );
+
+        return $sent;
+    }
+
+    /**
+     * The commission block a hub check-in or release response carries, so the app
+     * can say what was paid without a second call.
+     *
+     * Null-safe: a disabled feature, a zero rate, a direction with no rate, or a
+     * duplicate (already-credited) call all report `credited: false`.
+     *
+     * @return array{credited: bool, direction: string, amount: float|null, enabled: bool}
+     */
+    private function commissionResponse(?HubAgentCommission $credit, string $direction): array
+    {
+        return [
+            'credited' => $credit !== null,
+            'direction' => $direction,
+            'amount' => $credit !== null ? (float) $credit->amount : null,
+            'enabled' => $this->hubCommissions->isEnabled(),
+        ];
     }
 
     /**

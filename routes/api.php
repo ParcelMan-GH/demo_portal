@@ -91,6 +91,11 @@ Route::prefix('v1/hub')->group(function () {
         Route::post('handoffs', [HubBusHandoffController::class, 'store']);
         Route::get('handoffs/{handoff}', [HubBusHandoffController::class, 'show']);
 
+        // Check in ONE parcel by its own barcode. The desk scans individual
+        // parcels rather than the batch container; the batch endpoint above stays
+        // for taking a whole batch in at once.
+        Route::post('packages/intake', [HubController::class, 'intakePackage']);
+
         // Release to a rider or the recipient.
         Route::post('packages/release', [HubController::class, 'release']);
         // Assign a local rider and send the parcel out for doorstep delivery.

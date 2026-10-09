@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\CommissionTier;
+use App\Services\Hub\HubAgentCommissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -31,13 +32,20 @@ class CommissionRuleController extends Controller
      * band they switched off, or it becomes invisible and unrecoverable from the
      * UI while still sitting in the table.
      */
-    public function data(): JsonResponse
+    public function data(HubAgentCommissionService $hubCommissions): JsonResponse
     {
         $bands = CommissionTier::orderBy('min_collection')->get();
 
         return response()->json([
             'success' => true,
             'data' => [
+                /*
+                 * The hub agent's switch and per-parcel rates, alongside the agent
+                 * ladder. They are different shapes of money — a band function of a
+                 * day's collection versus a flat amount per parcel — but an admin
+                 * manages both from this one screen, so one payload carries both.
+                 */
+                'hub_agent' => $hubCommissions->settings(),
                 'bands' => $bands->map(fn (CommissionTier $t) => [
                     'id' => $t->id,
                     'min' => (float) $t->min_collection,
@@ -108,6 +116,36 @@ class CommissionRuleController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Band {$label} deleted.",
+        ]);
+    }
+
+    /**
+     * Switch the hub agent's per-parcel commission on or off, and set its rates.
+     *
+     * Persisted through the same `platform_settings` store every other admin
+     * setting uses, so it round-trips exactly like the ladder above does. The
+     * two rates are validated as money — non-negative numbers — because a credit
+     * is written from them directly; an unvalidated free-text rate would fail at
+     * the first intake rather than at the point it was typed.
+     */
+    public function saveHubAgent(Request $request, HubAgentCommissionService $hubCommissions): JsonResponse
+    {
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'inbound_rate' => ['required', 'numeric', 'min:0'],
+            'outbound_rate' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $hubCommissions->saveSettings(
+            (bool) $validated['enabled'],
+            (float) $validated['inbound_rate'],
+            (float) $validated['outbound_rate'],
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Hub agent commission updated.',
+            'data' => ['hub_agent' => $hubCommissions->settings()],
         ]);
     }
 

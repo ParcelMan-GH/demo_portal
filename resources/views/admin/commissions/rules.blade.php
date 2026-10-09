@@ -104,6 +104,62 @@
             </tbody>
         </table>
     </div>
+
+    {{--
+        Hub agent commission.
+
+        A different shape of money from the ladder above: a flat amount per parcel,
+        paid once when a parcel is checked in at the hub (inbound) and once when it
+        is released — counter handover or doorstep dispatch (outbound). There is no
+        amount collected to band, so this is a switch and two rates rather than
+        tiers. Off by default: nothing is paid until an admin turns it on.
+    --}}
+    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+            <div>
+                <h2 class="text-sm font-bold text-slate-800">Hub agent commission</h2>
+                <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                    A flat amount per parcel. Inbound is paid when a parcel is scanned in at the hub;
+                    outbound is paid once when it leaves, by counter handover or doorstep dispatch.
+                    Disabled means nothing is paid.
+                </p>
+            </div>
+            <label class="inline-flex cursor-pointer items-center gap-2">
+                <input type="checkbox" x-model="hubAgent.enabled" class="peer sr-only">
+                <span class="relative h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-emerald-500
+                             after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full
+                             after:bg-white after:transition-all peer-checked:after:translate-x-5"></span>
+                <span class="text-sm font-semibold text-slate-700" x-text="hubAgent.enabled ? 'Enabled' : 'Disabled'"></span>
+            </label>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 px-5 py-4 sm:grid-cols-2">
+            <div>
+                <label class="block text-sm font-semibold text-slate-600">Inbound rate (GH₵ per parcel)</label>
+                <input type="number" step="0.01" min="0" x-model="hubAgent.inbound_rate"
+                       class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <p class="mt-1 text-xs text-slate-400">
+                    Paid when a parcel is checked in at the hub. Defaults to 0.50.
+                </p>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-slate-600">Outbound rate (GH₵ per parcel)</label>
+                <input type="number" step="0.01" min="0" x-model="hubAgent.outbound_rate"
+                       class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <p class="mt-1 text-xs text-slate-400">
+                    Paid when a parcel is released from the hub. Defaults to 1.00.
+                </p>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 border-t border-slate-100 px-5 py-4">
+            <span x-show="hubAgent.saved" x-cloak class="text-sm font-semibold text-emerald-600">Saved.</span>
+            <span x-show="hubAgent.error" x-cloak class="text-sm text-rose-600" x-text="hubAgent.error"></span>
+            <button type="button" @click="saveHubAgent()" :disabled="hubAgent.saving"
+                    class="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    x-text="hubAgent.saving ? 'Saving…' : 'Save'"></button>
+        </div>
+    </div>
 </div>
 
 {{-- Create / Edit --}}
@@ -209,6 +265,9 @@ document.addEventListener('alpine:init', () => {
 
     Alpine.data('commissionRules', () => ({
         bands: [], summary: { gaps: [] }, loading: true,
+        // The hub agent's switch and per-parcel rates. Defaults match the server's
+        // so the form is sensible before the first load completes.
+        hubAgent: { enabled: false, inbound_rate: 0.5, outbound_rate: 1.0, saving: false, saved: false, error: '' },
 
         get tiles() {
             return [
@@ -229,6 +288,14 @@ document.addEventListener('alpine:init', () => {
             const { json } = await send(@json(route('admin.commissions.rules.data')), 'GET');
             this.bands = json.data?.bands ?? [];
             this.summary = json.data?.summary ?? { gaps: [] };
+
+            const hubAgent = json.data?.hub_agent;
+            if (hubAgent) {
+                this.hubAgent.enabled = !!hubAgent.enabled;
+                this.hubAgent.inbound_rate = hubAgent.inbound_rate ?? 0.5;
+                this.hubAgent.outbound_rate = hubAgent.outbound_rate ?? 1.0;
+            }
+
             this.loading = false;
         },
 
@@ -266,6 +333,45 @@ document.addEventListener('alpine:init', () => {
                 : `${this.money(band.min)} – ${this.money(band.max)}`;
             c.error = '';
             c.refresh = () => this.load();
+        },
+
+        /*
+         * Save the hub agent's switch and rates. Separate endpoint from the
+         * ladder, because it is a different shape of setting — but the same
+         * page, the same round-trip and the same error handling as the bands.
+         */
+        async saveHubAgent() {
+            this.hubAgent.saving = true;
+            this.hubAgent.error = '';
+            this.hubAgent.saved = false;
+
+            const payload = {
+                enabled: this.hubAgent.enabled,
+                inbound_rate: this.hubAgent.inbound_rate === '' ? 0 : Number(this.hubAgent.inbound_rate),
+                outbound_rate: this.hubAgent.outbound_rate === '' ? 0 : Number(this.hubAgent.outbound_rate),
+            };
+
+            const { ok, json } = await send(@json(route('admin.commissions.rules.hub-agent')), 'POST', payload);
+            this.hubAgent.saving = false;
+
+            if (! ok) {
+                const errs = json.errors || {};
+                this.hubAgent.error = errs.inbound_rate?.[0] || errs.outbound_rate?.[0]
+                    || errs.enabled?.[0] || json.message || 'Could not save.';
+                return;
+            }
+
+            // Echo the server's own values back, so what the form shows is what
+            // was actually persisted rather than what was typed.
+            const hubAgent = json.data?.hub_agent;
+            if (hubAgent) {
+                this.hubAgent.enabled = !!hubAgent.enabled;
+                this.hubAgent.inbound_rate = hubAgent.inbound_rate ?? this.hubAgent.inbound_rate;
+                this.hubAgent.outbound_rate = hubAgent.outbound_rate ?? this.hubAgent.outbound_rate;
+            }
+
+            this.hubAgent.saved = true;
+            setTimeout(() => { this.hubAgent.saved = false; }, 3000);
         },
     }));
 

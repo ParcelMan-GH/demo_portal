@@ -296,6 +296,9 @@ Route::prefix(config('backoffice.prefix', 'admin'))->name('admin.')->group(funct
         Route::get('commissions/rules', [CommissionRuleController::class, 'index'])->name('commissions.rules');
         Route::get('commissions/rules/data', [CommissionRuleController::class, 'data'])->name('commissions.rules.data');
         Route::post('commissions/rules', [CommissionRuleController::class, 'store'])->name('commissions.rules.store');
+        // The hub agent's switch and per-parcel rates. A POST on a named path, so
+        // it can never be confused with the `{band}` PUT/DELETE below.
+        Route::post('commissions/rules/hub-agent', [CommissionRuleController::class, 'saveHubAgent'])->name('commissions.rules.hub-agent');
         Route::put('commissions/rules/{band}', [CommissionRuleController::class, 'update'])->name('commissions.rules.update');
         Route::delete('commissions/rules/{band}', [CommissionRuleController::class, 'destroy'])->name('commissions.rules.destroy');
         Route::put('vendors/{vendor}', [VendorController::class, 'update'])->name('vendors.update');
