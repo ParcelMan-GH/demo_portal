@@ -361,8 +361,10 @@ class ShipmentItem extends Model
      * Call logs an agent recorded against this parcel.
      *
      * Two rules hang off this relation rather than off the parcel's own columns:
-     * a parcel that already has one is hidden from the agent's Call Queue, and a
-     * second call cannot be logged for it. Both are questions about the logs, so
+     * a parcel that already carries a *final* (locked) log is hidden from the
+     * agent's Call Queue, and a second call cannot be logged over a final one. A
+     * provisional log — rescheduled or unreachable — settles nothing, so the
+     * parcel stays callable. Both rules are questions about the logs, so
      * `whereDoesntHave('agentCallLogs')` answers the first in a single query
      * instead of a per-row lookup.
      */

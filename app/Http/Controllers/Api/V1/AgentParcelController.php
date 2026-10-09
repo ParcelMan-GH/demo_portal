@@ -9,11 +9,9 @@ use App\Models\AgentCallLog;
 use App\Models\AgentDailyQuota;
 use App\Models\CommissionTier;
 use App\Models\NotificationLog;
-use App\Models\OutgoingBatchAssignmentEvent;
 use App\Models\ShipmentItem;
 use App\Services\Agent\AgentCallConfirmationService;
 use App\Services\Agent\AgentCommissionExpirationService;
-use App\Services\OutgoingBatchAutoAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -133,15 +131,22 @@ class AgentParcelController extends Controller
         $agent = $request->user();
 
         /*
-         * The Call Queue holds the agent's claimed parcels that are still
-         * *waiting* for a call — and only those.
+         * The Call Queue holds the agent's claimed parcels that still have to be
+         * rung — and only those.
          *
-         * `status = picked_up` on its own kept every parcelled call in the queue
+         * `status = picked_up` on its own kept every called parcel in the queue
          * forever: a call outcome other than "confirmed" changes no status, so
          * once an agent logged a call the parcel still matched and could never
          * leave the list. "Still to call" and "currently picked up" are two
          * different questions, so the filter is now two conditions — still
-         * picked up, *and* no call log recorded.
+         * picked up, *and* no *final* call log on record.
+         *
+         * Only a locked outcome takes a parcel out. A retryable one
+         * (rescheduled / unreachable) is provisional, and it used to remove the
+         * parcel from the queue outright: an agent who marked a recipient
+         * "rescheduled" could never ring them again, because the card was gone
+         * and with it any way to log the second call. Those parcels now stay put
+         * until something final is logged against them.
          *
          * The exclusion is deliberately a query, not a new status. The brief only
          * names a target status for a confirmed call (`pending`); inventing one
@@ -161,7 +166,9 @@ class AgentParcelController extends Controller
              * the parcel as claimed. The queue means "parcels I still have to
              * ring", so only this agent's own calls should take one out of it.
              */
-            ->whereDoesntHave('agentCallLogs', fn ($query) => $query->where('agent_id', $agent->id))
+            ->whereDoesntHave('agentCallLogs', fn ($query) => $query
+                ->where('agent_id', $agent->id)
+                ->whereIn('outcome', AgentCallLog::LOCKED_OUTCOMES))
             ->latest()
             ->get();
 
@@ -265,7 +272,9 @@ class AgentParcelController extends Controller
                 // the list one screen away.
                 'pending_calls' => ShipmentItem::where('agent_id', $agent->id)
                     ->where('status', ItemStatus::PICKED_UP)
-                    ->whereDoesntHave('agentCallLogs', fn ($query) => $query->where('agent_id', $agent->id))
+                    ->whereDoesntHave('agentCallLogs', fn ($query) => $query
+                        ->where('agent_id', $agent->id)
+                        ->whereIn('outcome', AgentCallLog::LOCKED_OUTCOMES))
                     ->count(),
                 'rescheduled' => AgentCallLog::where('agent_id', $agent->id)
                     ->where('outcome', AgentCallLog::OUTCOME_RESCHEDULED)
@@ -315,7 +324,9 @@ class AgentParcelController extends Controller
                  */
                 'pending_tasks_count' => $pendingTasks = ShipmentItem::where('agent_id', $agent->id)
                     ->where('status', ItemStatus::PICKED_UP)
-                    ->whereDoesntHave('agentCallLogs', fn ($query) => $query->where('agent_id', $agent->id))
+                    ->whereDoesntHave('agentCallLogs', fn ($query) => $query
+                        ->where('agent_id', $agent->id)
+                        ->whereIn('outcome', AgentCallLog::LOCKED_OUTCOMES))
                     ->count(),
                 'has_remaining_tasks' => $pendingTasks > 0,
 
@@ -385,15 +396,20 @@ class AgentParcelController extends Controller
     /**
      * Record the outcome of a call the agent made about a parcel.
      *
-     * A "confirmed" outcome (the spec's "Confirmed Payment") is the trigger for
-     * auto-batching: the parcel joins the open outgoing batch for its
-     * destination, or gets a brand new batch when none is open yet. It also
-     * returns the parcel to `pending` so it leaves the call queue.
+     * A "confirmed" outcome (the spec's "Confirmed Payment") settles the parcel:
+     * it returns it to `pending` so it leaves the call queue, and it credits the
+     * calling agent's daily commission. It deliberately does *not* batch: a
+     * confirmed call used to join the open outgoing batch (or open a new one) as
+     * a side effect, which pushed the parcel onto an admin batch list from the
+     * agent's call screen. Choosing a batch is the admin dashboard's decision,
+     * so this path now only settles the parcel and pays the commission.
      *
-     * A parcel can only ever carry one call log: a second attempt is refused with
-     * a 409 (see below), and the queue is filtered on the same fact.
+     * Only a *locked* outcome (confirmed / cancelled) is final: a second attempt
+     * against one is refused with a 409 (see below), and the queue is filtered on
+     * the same fact. A retryable outcome (rescheduled / unreachable) leaves the
+     * parcel callable, so a later call may record over it.
      */
-    public function logCall(Request $request, OutgoingBatchAutoAssignmentService $autoBatching)
+    public function logCall(Request $request)
     {
         $request->validate([
             'parcel_id' => ['required'],
@@ -445,12 +461,10 @@ class AgentParcelController extends Controller
          * no lock lets both requests read "no call yet" and both insert.
          *
          * In the same transaction a confirmed outcome also moves the parcel from
-         * `picked_up` to `pending`, before the auto-batching claims it for its
-         * destination. Atomic on purpose: if batching throws, the status change
-         * must not survive on its own. (Batching opens its own transaction; under
-         * a surrounding one it becomes a savepoint, so it still shares our fate.)
+         * `picked_up` to `pending` and credits the commission. Atomic on purpose:
+         * the status change and the money must not survive on their own.
          */
-        $result = DB::transaction(function () use ($request, $agent, $parcel, $outcome, $autoBatching) {
+        $result = DB::transaction(function () use ($request, $agent, $parcel, $outcome) {
             $locked = ShipmentItem::query()
                 ->whereKey($parcel->getKey())
                 ->lockForUpdate()
@@ -461,18 +475,27 @@ class AgentParcelController extends Controller
             }
 
             /*
-             * One logged call per parcel. Read *under the lock* so a concurrent
-             * insert cannot slip past it: the racer is either before us (we see
-             * its log) or behind us (it waits for our lock and then sees ours).
+             * The parcel's most recent call. Read *under the lock* so a
+             * concurrent insert cannot slip past it: the racer is either before
+             * us (we see its log) or behind us (it waits for our lock and then
+             * sees ours).
+             *
+             * Only a locked outcome closes the parcel. A retryable one
+             * (rescheduled / unreachable) was provisional, so a later call
+             * records over it — as a new row, because everything that reads these
+             * logs already takes the latest one, and the earlier attempt stays
+             * on the record rather than being erased.
              */
             $existingLog = AgentCallLog::query()
                 ->where('shipment_item_id', $locked->getKey())
                 ->latest('id')
                 ->first();
 
-            if ($existingLog) {
+            if ($existingLog && AgentCallLog::isLockedOutcome($existingLog->outcome)) {
                 return ['state' => 'duplicate', 'existing' => $existingLog];
             }
+
+            $overwrotePrevious = $existingLog !== null;
 
             if (! $locked->agent_id) {
                 $locked->update([
@@ -556,19 +579,14 @@ class AgentParcelController extends Controller
                     'earned_commission' => $tier?->payout_amount ?? 0.00,
                 ]);
 
-                $assignment = $autoBatching->assignForDestination(
-                    $locked->fresh(),
-                    OutgoingBatchAssignmentEvent::SOURCE_AGENT_CALL,
-                    (int) $agent->id
-                );
-
-                $batching = [
-                    'result' => $assignment['result'],
-                    'batch_id' => $assignment['batch']?->id,
-                    'batch_number' => $assignment['batch']?->batch_number,
-                    'batch_created' => $assignment['created'],
-                    'message' => $assignment['message'],
-                ];
+                /*
+                 * No batching from this path. A confirmed call used to join the
+                 * open outgoing batch for its destination (or open a new one),
+                 * which is what quietly pushed the parcel onto an admin batch
+                 * list. Choosing a batch belongs to the admin dashboard, so a
+                 * confirmed call now only settles the parcel and pays the
+                 * commission — `$batching` stays null and is reported as such.
+                 */
             }
 
             // Re-read once so `new_status` is what the app should show, including
@@ -579,6 +597,7 @@ class AgentParcelController extends Controller
                 'state' => 'logged',
                 'log' => $log,
                 'batching' => $batching,
+                'overwrote_previous' => $overwrotePrevious,
                 'new_status' => $locked->status instanceof ItemStatus
                     ? $locked->status->value
                     : (string) $locked->status,
@@ -597,19 +616,22 @@ class AgentParcelController extends Controller
 
             /*
              * 409 Conflict rather than 422: the request is well formed and the
-             * data is valid — it simply collides with a call that already exists
-             * for this parcel. The existing outcome and time are returned so the
-             * app can explain *why* the Call button is now unavailable instead of
-             * just failing.
+             * data is valid — it simply collides with a call whose outcome is
+             * final. Only a locked outcome (confirmed / cancelled) can reach
+             * here; a retryable one was overwritten above. The existing outcome
+             * and time are returned so the app can explain *why* the outcome is
+             * now locked instead of just failing.
              */
             return response()->json([
                 'success' => false,
                 'message' => 'A call has already been logged for this parcel.',
                 'data' => [
+                    'overwrote_previous' => false,
                     'existing_call_log' => [
                         'id' => $existing->getKey(),
                         'outcome' => $existing->outcome,
                         'created_at' => optional($existing->created_at)->toIso8601String(),
+                        'locked' => true,
                     ],
                 ],
             ], 409);
@@ -622,6 +644,7 @@ class AgentParcelController extends Controller
                 'call_log' => $result['log'],
                 'batching' => $result['batching'],
                 'new_status' => $result['new_status'],
+                'overwrote_previous' => $result['overwrote_previous'],
             ],
         ]);
     }
@@ -816,7 +839,9 @@ class AgentParcelController extends Controller
                  */
                 'pending_tasks_count' => $ledgerPending = ShipmentItem::where('agent_id', $agent->id)
                     ->where('status', ItemStatus::PICKED_UP)
-                    ->whereDoesntHave('agentCallLogs', fn ($query) => $query->where('agent_id', $agent->id))
+                    ->whereDoesntHave('agentCallLogs', fn ($query) => $query
+                        ->where('agent_id', $agent->id)
+                        ->whereIn('outcome', AgentCallLog::LOCKED_OUTCOMES))
                     ->count(),
                 'has_remaining_tasks' => $ledgerPending > 0,
 
@@ -897,16 +922,12 @@ class AgentParcelController extends Controller
             return 'Call outcome recorded.';
         }
 
-        if (! $batching) {
-            return 'Payment confirmed.';
-        }
-
-        return match ($batching['result']) {
-            OutgoingBatchAutoAssignmentService::RESULT_BATCH_CREATED,
-            OutgoingBatchAutoAssignmentService::RESULT_BATCH_ATTACHED => 'Payment confirmed. '.$batching['message'],
-            OutgoingBatchAutoAssignmentService::RESULT_ALREADY_BATCHED => 'Payment confirmed. '.$batching['message'],
-            default => 'Payment confirmed, but the parcel could not be batched: '.$batching['message'],
-        };
+        /*
+         * A confirmed call no longer batches, so there is never a batching
+         * result to report. The parameter is kept so this signature — and the
+         * response shape built around it — survive if batching is wired back in.
+         */
+        return 'Payment confirmed.';
     }
 
     /**

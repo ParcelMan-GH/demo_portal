@@ -30,6 +30,50 @@ class AgentCallLog extends Model
     ];
 
     /**
+     * Outcomes an agent may overwrite on a later call.
+     *
+     * A parcel is often rung more than once — the recipient asks to be called
+     * back, or does not pick up — and neither of those settles anything. A log
+     * carrying one of these outcomes is therefore provisional: a later call may
+     * record over it, and the parcel stays in the agent's call queue.
+     *
+     * @var array<int, string>
+     */
+    public const RETRYABLE_OUTCOMES = [
+        self::OUTCOME_RESCHEDULED,
+        self::OUTCOME_UNREACHABLE,
+    ];
+
+    /**
+     * Outcomes that are final.
+     *
+     * Once one of these is logged the outcome is locked: the app must not offer
+     * to overwrite it, and the parcel leaves the call queue for good.
+     *
+     * @var array<int, string>
+     */
+    public const LOCKED_OUTCOMES = [
+        self::OUTCOME_CONFIRMED,
+        self::OUTCOME_CANCELLED,
+    ];
+
+    /**
+     * Whether a logged call may be overwritten by a later one.
+     */
+    public static function isRetryableOutcome(?string $outcome): bool
+    {
+        return in_array($outcome, self::RETRYABLE_OUTCOMES, true);
+    }
+
+    /**
+     * Whether a logged call is final and must not be overwritten.
+     */
+    public static function isLockedOutcome(?string $outcome): bool
+    {
+        return in_array($outcome, self::LOCKED_OUTCOMES, true);
+    }
+
+    /**
      * Client spellings mapped onto the canonical outcomes.
      *
      * The spec for this feature calls the trigger "Confirmed Payment" and
