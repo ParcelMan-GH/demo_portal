@@ -166,10 +166,20 @@ class AgentParcelController extends Controller
              * the parcel as claimed. The queue means "parcels I still have to
              * ring", so only this agent's own calls should take one out of it.
              */
-            ->whereDoesntHave('agentCallLogs', fn ($query) => $query
-                ->where('agent_id', $agent->id)
-                ->whereIn('outcome', AgentCallLog::LOCKED_OUTCOMES))
-            ->latest()
+             ->whereDoesntHave('agentCallLogs', fn ($query) => $query
+                 ->where('agent_id', $agent->id)
+                 ->whereIn('outcome', AgentCallLog::LOCKED_OUTCOMES))
+             /*
+              * This agent's own most recent call, newest first, so the app can
+              * say what happened last time when a parcel comes back round after
+              * a rescheduled or unreachable attempt. Eager-loaded rather than
+              * read inside the map: a page of parcels would otherwise fire one
+              * query per row.
+              */
+             ->with(['agentCallLogs' => fn ($query) => $query
+                 ->where('agent_id', $agent->id)
+                 ->latest('id')])
+             ->latest()
             ->get();
 
         /*
@@ -240,8 +250,16 @@ class AgentParcelController extends Controller
                     'address' => $parcel->delivery_gh_post_address,
                     'items_count' => (int) ($parcel->quantity ?? 1),
                     'total_fee' => (float) ($parcel->delivery_fee ?? 0),
-                    'claimed_at' => optional($parcel->updated_at)->toIso8601String(),
-                ]
+                     'claimed_at' => optional($parcel->updated_at)->toIso8601String(),
+                     /*
+                      * Only ever a *retryable* outcome — a locked one takes the
+                      * parcel out of this query entirely — so anything here is
+                      * context for the call the agent is about to make, not a
+                      * reason to refuse it.
+                      */
+                     'last_call_outcome' => $parcel->agentCallLogs->first()?->outcome,
+                     'last_call_at' => optional($parcel->agentCallLogs->first()?->created_at)->toIso8601String(),
+                 ]
             ))->values(),
         ]);
     }
