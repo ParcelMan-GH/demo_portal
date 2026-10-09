@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\FulfillmentType;
 use App\Enums\ItemStatus;
 use App\Helpers\CodeResolver;
 use App\Http\Controllers\Controller;
@@ -151,6 +152,16 @@ class HubController extends Controller
                 'hub' => $this->serializeHub($hub),
                 'user' => $this->serializeUser($user),
                 'metrics' => [
+                    /*
+                     * The home screen's three tiles, named for what the agent is
+                     * looking at: what is on the shelf for its owner, what is on
+                     * its way in, and what still has to go out again.
+                     */
+                    'items_to_be_picked_count' => $counts['items_to_be_picked'],
+                    'expected_batch_count' => $counts['expected_batch'],
+                    'items_to_be_delivered_count' => $counts['items_to_be_delivered'],
+
+                    // Older names, kept so any client still reading them works.
                     'in_hub_count' => $counts['at_hub'],
                     'inbound_today_count' => $counts['received_today'],
                     'ready_for_bus_count' => $counts['ready_for_bus'],
@@ -1240,11 +1251,53 @@ class HubController extends Controller
         // not the dispatched count — see ShipmentItem::scopeWaitingBus().
         $readyForBus = (clone $base)->waitingBus($hub)->count();
 
+        // Everything physically on this hub's shelf.
+        $onShelf = (clone $base)->whereIn('status', array_map(
+            fn (ItemStatus $status) => $status->value,
+            self::AT_HUB_STATUSES
+        ));
+        $atHub = (clone $onShelf)->count();
+
+        /*
+         * The shelf splits by how the parcel finishes its journey, which is the
+         * question the agent actually has in front of them: is the owner walking
+         * in for it, or does it still have to go out again?
+         *
+         * `fulfillment_type` is the column that carries this (see FulfillmentType).
+         * A null is read as "still needs delivery" rather than dropped, so the two
+         * tiles always add up to `at_hub` and nothing can sit on the shelf unseen
+         * by both.
+         */
+        $toBePicked = (clone $onShelf)
+            ->where('fulfillment_type', FulfillmentType::SELF_PICKUP->value)
+            ->count();
+
+        /*
+         * Card 2 counts what is *coming* rather than what is here: parcels on a
+         * batch aimed at this hub that have not been checked in yet. It is the
+         * mirror of `waitingBus()`, which asks the same question in the other
+         * direction, and it is deliberately hub-wide rather than agent-scoped —
+         * "what is on its way to my station" is not a personal figure.
+         */
+        $expectedBatch = ShipmentItem::query()
+            ->whereIn('status', [
+                ItemStatus::IN_TRANSIT->value,
+                ItemStatus::DISPATCHED_TO_BUS->value,
+            ])
+            ->where(function ($target) use ($hub) {
+                $target->whereHas('sortBatches', function ($batch) use ($hub) {
+                    $batch->where('sort_batches.destination_warehouse_id', $hub->id);
+                })->orWhereHas('outgoingBatch', function ($batch) use ($hub) {
+                    $batch->where('outgoing_batches.destination_warehouse_id', $hub->id);
+                });
+            })
+            ->count();
+
         return [
-            'at_hub' => (clone $base)->whereIn('status', array_map(
-                fn (ItemStatus $status) => $status->value,
-                self::AT_HUB_STATUSES
-            ))->count(),
+            'at_hub' => $atHub,
+            'items_to_be_picked' => $toBePicked,
+            'items_to_be_delivered' => $atHub - $toBePicked,
+            'expected_batch' => $expectedBatch,
             'ready_for_bus' => $readyForBus,
             'dispatched_to_bus' => (clone $base)->where('status', ItemStatus::DISPATCHED_TO_BUS->value)->count(),
             'released_today' => (clone $base)->whereNotNull('released_at')
