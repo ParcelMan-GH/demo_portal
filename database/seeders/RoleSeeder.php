@@ -55,7 +55,16 @@ class RoleSeeder extends Seeder
             ],
             [
                 'slug' => 'contact_agent',
-                'name' => 'Contact Agent',
+                /*
+                 * Named for the work, not the chair. Everything this role touches
+                 * is money — recipient payments, counter intake, delivery
+                 * preferences paid for over the counter.
+                 *
+                 * The slug stays `contact_agent`: `role:contact_agent` gates the
+                 * whole agent API, and every assignment row keys off it. This is a
+                 * display rename only.
+                 */
+                'name' => 'Payment Desk',
                 'description' => 'Handles branch office counter intake, customer parcel booking, recipient delivery preferences, and counter pick-ups.',
                 'assignable' => true,
                 'permissions' => $this->permissionIds([
@@ -83,7 +92,7 @@ class RoleSeeder extends Seeder
             ],
             [
                 'slug' => 'external_hub_agent',
-                'name' => 'External Hub Agent',
+                'name' => '----- Agents',
                 'description' => 'Manages partner hub operations, regional parcel intake, sorting, and forwarding packages to local delivery teams.',
                 'assignable' => true,
                 'permissions' => $this->permissionIds([
