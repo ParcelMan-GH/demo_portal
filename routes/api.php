@@ -93,6 +93,8 @@ Route::prefix('v1/hub')->group(function () {
 
         // Release to a rider or the recipient.
         Route::post('packages/release', [HubController::class, 'release']);
+        // Assign a local rider and send the parcel out for doorstep delivery.
+        Route::post('packages/dispatch', [HubController::class, 'dispatchForDelivery']);
         Route::post('packages/shelf', [HubController::class, 'shelve']);
 
         // Text the recipient that their parcel is waiting at the hub.

@@ -158,7 +158,14 @@ class HubController extends Controller
                      * its way in, and what still has to go out again.
                      */
                     'items_to_be_picked_count' => $counts['items_to_be_picked'],
-                    'expected_batch_count' => $counts['expected_batch'],
+                    /*
+                     * "Total items scanned in today" — items, not batches: a batch
+                     * of fifteen parcels counts as fifteen. That is the
+                     * `arrived_at_hub_at` roll-up, the timestamp every check-in
+                     * writes whether it came from a batch scan or a single one, so
+                     * it needs no query of its own.
+                     */
+                    'items_scanned_today_count' => $counts['received_today'],
                     'items_to_be_delivered_count' => $counts['items_to_be_delivered'],
 
                     // Older names, kept so any client still reading them works.
@@ -953,6 +960,110 @@ class HubController extends Controller
     }
 
     /**
+     * Dispatch a parcel for doorstep delivery by assigning a local rider.
+     *
+     * This is the counterpart to handing a parcel over the counter: instead of
+     * the recipient collecting with their pickup code, the hub hands the parcel
+     * to a local rider and records who took it and the fee agreed for the trip.
+     * The agreed fee is written to the item's own `delivery_fee` column rather
+     * than a second, parallel field.
+     */
+    public function dispatchForDelivery(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'package_id' => ['nullable'],
+            'barcode' => ['nullable', 'string', 'max:120'],
+            'tracking_code' => ['nullable', 'string', 'max:120'],
+            'rider_name' => ['required', 'string', 'max:120'],
+            'rider_phone' => ['required', 'string', 'max:30'],
+            // The fee agreed at dispatch, in GHS. Optional: a parcel can go out
+            // before the amount is settled, and the agent may leave it blank.
+            'delivery_fee' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $user = $request->user();
+        $hub = $user->warehouse;
+
+        $code = $validated['barcode']
+            ?? $validated['tracking_code']
+            ?? $validated['package_id']
+            ?? null;
+
+        if (! $code) {
+            return $this->failed('Provide the package to dispatch.', 422);
+        }
+
+        $item = $this->findItemByCode($code);
+
+        if (! $item) {
+            return $this->failed("No package found for {$code}.", 404);
+        }
+
+        if (! $item->isAtHub((int) $hub->id)) {
+            return $this->failed("{$this->parcelLabel($item)} is not held at {$hub->name}.", 403);
+        }
+
+        // A parcel that has already left for delivery — by this route or the
+        // counter handover — must not be dispatched a second time. `released_at`
+        // is the single marker both paths write; the status check catches a row
+        // that somehow carries one without the other.
+        $alreadyLeft = $item->released_at
+            || in_array($item->status, [
+                ItemStatus::OUT_FOR_DELIVERY,
+                ItemStatus::HANDED_TO_COURIER,
+                ItemStatus::DELIVERED,
+            ], true);
+
+        if ($alreadyLeft) {
+            return $this->failed("{$this->parcelLabel($item)} has already left the hub.", 422);
+        }
+
+        $update = [
+            'status' => ItemStatus::OUT_FOR_DELIVERY->value,
+            'dispatch_rider_name' => $validated['rider_name'],
+            'dispatch_rider_phone' => $validated['rider_phone'],
+            'dispatched_for_delivery_at' => now(),
+            // Same marker the counter handover writes, so the release guard and
+            // the `released_today` count treat both routes alike.
+            'released_at' => now(),
+        ];
+
+        // Only overwrite the agreed fee when one was actually sent — an absent
+        // fee must not zero out whatever `delivery_fee` already holds.
+        if (array_key_exists('delivery_fee', $validated) && $validated['delivery_fee'] !== null) {
+            $update['delivery_fee'] = $validated['delivery_fee'];
+        }
+
+        $item->update($update);
+
+        $this->logTracking(
+            $item,
+            ItemStatus::OUT_FOR_DELIVERY,
+            $hub,
+            "Dispatched to rider {$validated['rider_name']} for doorstep delivery",
+            array_filter([
+                'source' => 'hub_dispatch_delivery',
+                'rider_name' => $validated['rider_name'],
+                'rider_phone' => $validated['rider_phone'],
+                'delivery_fee' => $validated['delivery_fee'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ], fn ($value) => $value !== null),
+            (int) $user->id
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Package dispatched to {$validated['rider_name']} for doorstep delivery.",
+            'data' => [
+                'hub' => $this->serializeHub($hub),
+                'package' => $this->serializePackage($item->fresh(), $hub),
+                'counts' => $this->hubCounts($hub),
+            ],
+        ]);
+    }
+
+    /**
      * Rack a parcel on a shelf.
      */
     public function shelve(Request $request): JsonResponse
@@ -1272,32 +1383,10 @@ class HubController extends Controller
             ->where('fulfillment_type', FulfillmentType::SELF_PICKUP->value)
             ->count();
 
-        /*
-         * Card 2 counts what is *coming* rather than what is here: parcels on a
-         * batch aimed at this hub that have not been checked in yet. It is the
-         * mirror of `waitingBus()`, which asks the same question in the other
-         * direction, and it is deliberately hub-wide rather than agent-scoped —
-         * "what is on its way to my station" is not a personal figure.
-         */
-        $expectedBatch = ShipmentItem::query()
-            ->whereIn('status', [
-                ItemStatus::IN_TRANSIT->value,
-                ItemStatus::DISPATCHED_TO_BUS->value,
-            ])
-            ->where(function ($target) use ($hub) {
-                $target->whereHas('sortBatches', function ($batch) use ($hub) {
-                    $batch->where('sort_batches.destination_warehouse_id', $hub->id);
-                })->orWhereHas('outgoingBatch', function ($batch) use ($hub) {
-                    $batch->where('outgoing_batches.destination_warehouse_id', $hub->id);
-                });
-            })
-            ->count();
-
         return [
             'at_hub' => $atHub,
             'items_to_be_picked' => $toBePicked,
             'items_to_be_delivered' => $atHub - $toBePicked,
-            'expected_batch' => $expectedBatch,
             'ready_for_bus' => $readyForBus,
             'dispatched_to_bus' => (clone $base)->where('status', ItemStatus::DISPATCHED_TO_BUS->value)->count(),
             'released_today' => (clone $base)->whereNotNull('released_at')
@@ -1340,6 +1429,11 @@ class HubController extends Controller
             'arrived_at_hub_at' => $item->arrived_at_hub_at?->toIso8601String(),
             'dispatched_to_bus_at' => $item->dispatched_to_bus_at?->toIso8601String(),
             'released_at' => $item->released_at?->toIso8601String(),
+            // Doorstep dispatch, when it happened — null for a parcel that has
+            // not been handed to a rider.
+            'dispatch_rider_name' => $item->dispatch_rider_name,
+            'dispatch_rider_phone' => $item->dispatch_rider_phone,
+            'dispatched_for_delivery_at' => $item->dispatched_for_delivery_at?->toIso8601String(),
             'hub' => $this->serializeHub($hub),
             'destination' => [
                 'region' => $this->regionName($item->delivery_region_id),

@@ -54,6 +54,13 @@ class ShipmentItem extends Model
         'released_at',
         'shelf_location',
         'pickup_code',
+
+        // Doorstep dispatch: the local rider a hub handed the parcel to, and
+        // when. The agreed fee reuses `delivery_fee` above rather than a new
+        // column.
+        'dispatch_rider_name',
+        'dispatch_rider_phone',
+        'dispatched_for_delivery_at',
     ];
 
     public const DELIVERY_METHOD_DIRECT = 'direct';
@@ -268,6 +275,7 @@ class ShipmentItem extends Model
         'arrived_at_hub_at' => 'datetime',
         'dispatched_to_bus_at' => 'datetime',
         'released_at' => 'datetime',
+        'dispatched_for_delivery_at' => 'datetime',
     ];
 
     /**
